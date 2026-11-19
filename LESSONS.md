@@ -27,3 +27,12 @@ I read `src/game.js` (hero, cannon, ragdoll, stunt scoring), `src/core.js` (XPBD
 - **Sleeping stacks need wake propagation.** Knocking out the middle of a sleeping tower left the top floating. Any crate that moves more than 1 cm in a tick now wakes the sleepers it touches, recursively.
 - **Friction must include the gravity support term.** Without `mu * g * dt` in the normal impulse, resting contacts had no friction and a noodle slid 88 m. With it, the slide is 34 m.
 - **Golf needed rules for the cannon's position, not only for physics:** it must never park over the hole, it must be able to fire backwards after an overshoot, and a body draped over the cup with its centre of mass over the hole counts as sunk.
+
+## v0.2 findings
+
+- **A rope is a max-only stick.** Chains built from `min 0, max L/n` links go slack naturally. A rope bridge is planks joined corner to corner with loose links; a seesaw is a plank whose four corners are tied to one fixed point.
+- **Buoyancy needs arithmetic, not tuning.** At first the sky-crate balloons had a lift of `gs = -6.2` and the crate flew away. Neutral lift is `(crate + rope mass) * g / (balloons * balloon mass * g)` = 1.63, plus heavy drag so the crate hovers. There is a gate for it.
+- **Settle before play.** Bridges sag and seesaws tip in the first second. Without a settling pass that resets every crate's "moved" baseline, each first shot was credited with Property Damage it did not cause.
+- **Spreading out is a flat plate.** A force along the body normal, `-k * v_n * |v|`, is enough: a belly-first fall brakes and a shallow dive gives lift. A spread noodle fired at 18 m/s ends more than 2 m higher after 1.5 s than a limp one (gated).
+- **Siege balance came from three measurements, not guesses.** One-crate-wide columns with TNT lost all three kings to a single shot on 4 of 6 seeds. Two-wide columns plus "off the throne" (fell 1.5 m, or moved 4 m) give battles of 2 to 17 turns. The CPU first used a drag-free formula and kept landing on the middle hill. Then a point-mass forecast with drag and wind, with the hill counted as "short" in the power search, hit within about 0.3 m. Its accuracy is now limited on purpose (±7 % power).
+- **Bundle hygiene.** Two `sed`-inserted comments silently swallowed code that followed them on the same line (`// ...` to end of line). After that, comments went in with Python or Edit, never inline through sed.

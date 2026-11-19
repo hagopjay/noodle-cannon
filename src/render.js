@@ -4,6 +4,7 @@ import { centre } from './engine.js';
 const THEMES = {
   carnival: { sky: ['#5bc0ff', '#ffe3b8'], far: '#b9d7ff', mid: '#8fd18a', ground: '#6a4a3a', top: '#7fcf4f', stone: '#8d8aa8' },
   sea: { sky: ['#20306f', '#ff9a8b'], far: '#3b3f8f', mid: '#6b4f9a', ground: '#4b3a5a', top: '#8a7bb8', stone: '#6d6990', sea: '#1aa2c9' },
+  dusk: { sky: ['#2b1d4f', '#ff8f6b'], far: '#5a3a7a', mid: '#8a4f7a', ground: '#4a3328', top: '#c98a4b', stone: '#7a6f8f' },
   meadow: { sky: ['#8fdcff', '#f4ffe0'], far: '#b5e3c8', mid: '#86cf7e', ground: '#6b4b2e', top: '#57b84a', stone: '#9a9a9a', sand: '#f2d38a', water: '#38b2e0' },
 };
 const SUIT = '#ff4f6d', SKIN = '#ffd9b8', HAT = '#ffd23f';
@@ -34,7 +35,8 @@ export class View {
       this.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + speed * 0.3, life, t: 0, c: colors[i % colors.length], g: grav, s: size * (0.6 + Math.random() * 0.8), rot: Math.random() * 6 }); }
     if (this.parts.length > 900) this.parts.splice(0, this.parts.length - 900);
   }
-  pop(x, y, text, sub, color = '#fff', big = false) { const slot = this.pops.filter(p => p.t < 0.7).length % 5; this.pops.push({ x, y, text, sub, color, t: 0, big, slot }); if (this.pops.length > 14) this.pops.shift(); }
+  pop(x, y, text, sub, color = '#fff', big = false) {   // stagger bursts of tricks so each one gets read
+    const waiting = this.pops.filter(p => p.t < 0.25).length, slot = this.pops.filter(p => p.t < 0.9).length % 4; this.pops.push({ x, y, text, sub, color, t: -0.22 * waiting, big, slot }); if (this.pops.length > 12) this.pops.shift(); }
   kick(a) { if (!this.reduced) this.shake = Math.min(1.2, this.shake + a); }
 
   draw(m, dt) {
@@ -48,6 +50,7 @@ export class View {
     if (m.theme === 'sea') this.sea(th);
     // static shapes
     for (const s of m.W.S) this.shape(s, th, m);
+    for (const f of m.W.fields) this.field(f);
     if (m.water) this.water(m, th);
     if (m.cup) this.flag(m);
     if (m.flags) for (const d of m.flags) this.distFlag(d);
@@ -56,11 +59,13 @@ export class View {
     if (m.trail.length > 1) this.path(m.trail, 'rgba(255,255,255,0.65)', 2.5, [2, 7]);
     // quads
     for (const q of m.W.Q) this.quad(q);
+    this.ropes(m); this.freeBits(m);
     if (m.stars) for (const s of m.stars) if (!s.got) this.star(s.x, s.y);
     // cannons
     const cannons = m.cannons || [m.cannon];
     for (const k of cannons) if (k && Math.abs(k.x - this.cam.x) * this.cam.s < this.W) this.cannon(k, m);
     if (m.phase === 'aim' && m.cannon && !m.done && m.cannon.maxP !== m.cannon.minP) this.aimArc(m);
+    if (m.sp && m.sp.grab && m.noodle) { const g = m.sp.grab; c.strokeStyle = '#ff4fa3'; c.lineWidth = 3; c.beginPath(); c.moveTo(this.X(g.hand.x), this.Y(g.hand.y)); c.lineTo(this.X(g.target.x), this.Y(g.target.y)); c.stroke(); }
     // noodles: old bodies first
     for (const n of m.bodies) if (n !== m.noodle && !n.list[0].off) this.noodle(n, false, m);
     if (m.noodle) this.noodle(m.noodle, true, m);
@@ -129,12 +134,36 @@ export class View {
   quad(q) {
     const c = this.cx, v = q.v; if (v[0].off) return;
     if (q.maxx < this.cam.x - this.W / this.cam.s || q.minx > this.cam.x + this.W / this.cam.s) return;
-    const fill = q.kind === 'tnt' ? (q.fuse ? (Math.floor(this.time * 30) % 2 ? '#fff' : '#ff3b3b') : '#e8392f') : q.kind === 'plank' ? '#d99a5b' : q.kind === 'mill' ? '#9b7bff' : '#e8b25e';
+    const fill = q.kind === 'tnt' ? (q.fuse ? (Math.floor(this.time * 30) % 2 ? '#fff' : '#ff3b3b') : '#e8392f') : q.kind === 'plank' ? '#d99a5b' : q.kind === 'mill' ? '#9b7bff'
+      : q.kind === 'pin' ? '#fbf7ee' : q.kind === 'king' ? (q.down ? '#8f8a7a' : '#ffd23f') : '#e8b25e';
     c.fillStyle = fill; c.strokeStyle = 'rgba(60,30,10,0.75)'; c.lineWidth = Math.max(1, 0.06 * this.cam.s); c.lineJoin = 'round';
     c.beginPath(); v.forEach((p, i) => i ? c.lineTo(this.X(p.x), this.Y(p.y)) : c.moveTo(this.X(p.x), this.Y(p.y))); c.closePath(); c.fill(); c.stroke();
     if (q.kind === 'crate') { c.beginPath(); c.moveTo(this.X(v[0].x), this.Y(v[0].y)); c.lineTo(this.X(v[2].x), this.Y(v[2].y)); c.moveTo(this.X(v[1].x), this.Y(v[1].y)); c.lineTo(this.X(v[3].x), this.Y(v[3].y)); c.stroke(); }
+    if (q.kind === 'pin') { const [x, y] = centre(q), a = Math.atan2(v[1].y - v[0].y, v[1].x - v[0].x); c.save(); c.translate(this.X(x), this.Y(y)); c.rotate(-a); c.fillStyle = '#e8392f'; c.fillRect(-0.13 * this.cam.s, -0.18 * this.cam.s, 0.26 * this.cam.s, 0.07 * this.cam.s); c.restore(); }
+    if (q.kind === 'king') { const [x, y] = centre(q), a = Math.atan2(v[1].y - v[0].y, v[1].x - v[0].x), s = this.cam.s; c.save(); c.translate(this.X(x), this.Y(y)); c.rotate(-a);
+      c.fillStyle = q.down ? '#b0a890' : '#ffb000'; c.beginPath(); c.moveTo(-0.4 * s, -0.5 * s); c.lineTo(-0.4 * s, -0.95 * s); c.lineTo(-0.2 * s, -0.7 * s); c.lineTo(0, -1.0 * s); c.lineTo(0.2 * s, -0.7 * s); c.lineTo(0.4 * s, -0.95 * s); c.lineTo(0.4 * s, -0.5 * s); c.fill(); c.stroke();
+      c.fillStyle = '#2b2d42'; c.beginPath(); c.arc(-0.15 * s, -0.05 * s, 0.06 * s, 0, 7); c.arc(0.15 * s, -0.05 * s, 0.06 * s, 0, 7); c.fill(); c.lineWidth = 2; c.beginPath(); c.arc(0, 0.12 * s, 0.14 * s, q.down ? Math.PI + 0.3 : 0.3, q.down ? -0.3 : Math.PI - 0.3); c.stroke(); c.restore(); }
     if (q.kind === 'tnt') { const [x, y] = centre(q); c.fillStyle = '#fff'; c.font = `900 ${Math.round(0.36 * this.cam.s)}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
       c.save(); c.translate(this.X(x), this.Y(y)); c.rotate(-Math.atan2(v[1].y - v[0].y, v[1].x - v[0].x)); c.fillText('TNT', 0, 0); c.restore(); c.textBaseline = 'alphabetic'; }
+  }
+  field(f) {   // a fan's updraft: drifting streaks
+    const c = this.cx; c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 2;
+    for (let i = 0; i < 9; i++) { const x = f.x0 + (f.x1 - f.x0) * (i + 0.5) / 9, h = f.y1 - f.y0, y = f.y0 + ((this.time * 6 + i * 1.7) % h);
+      c.beginPath(); c.moveTo(this.X(x), this.Y(y)); c.lineTo(this.X(x + Math.sin(this.time * 4 + i) * 0.1), this.Y(y + 0.8)); c.stroke(); }
+    c.fillStyle = '#555'; c.fillRect(this.X(f.x0 + 0.1), this.Y(f.y0), (f.x1 - f.x0 - 0.2) * this.cam.s, 0.15 * this.cam.s);
+  }
+  ropes(m) {
+    const c = this.cx; c.lineWidth = Math.max(1.5, 0.06 * this.cam.s); c.strokeStyle = '#3b2f2a';
+    for (const r of m.W.ropes) { if (r.length < 2) continue; c.beginPath(); r.forEach((p, i) => { if (p.off) return; i ? c.lineTo(this.X(p.x), this.Y(p.y)) : c.moveTo(this.X(p.x), this.Y(p.y)); }); c.stroke(); }
+  }
+  freeBits(m) {
+    const c = this.cx, s = this.cam.s;
+    for (const p of m.W.P) {
+      if (p.off || p.quad) continue;
+      if (p.tag === 'iron') { const g = c.createRadialGradient(this.X(p.x) - p.r * s * 0.3, this.Y(p.y) - p.r * s * 0.3, 1, this.X(p.x), this.Y(p.y), p.r * s); g.addColorStop(0, '#8a8f9c'); g.addColorStop(1, '#1d1f27'); c.fillStyle = g; c.beginPath(); c.arc(this.X(p.x), this.Y(p.y), p.r * s, 0, 7); c.fill(); }
+      else if (p.tag === 'balloon') { c.fillStyle = p.color || '#ff5d8f'; c.beginPath(); c.ellipse(this.X(p.x), this.Y(p.y), p.r * s * 0.9, p.r * s * 1.1, 0, 0, 7); c.fill(); c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.ellipse(this.X(p.x) - p.r * s * 0.3, this.Y(p.y) - p.r * s * 0.35, p.r * s * 0.2, p.r * s * 0.3, -0.5, 0, 7); c.fill(); }
+      else if (p.tag === 'hook') { c.fillStyle = '#2b2d42'; c.fillRect(this.X(p.x) - 0.6 * s, this.Y(p.y) - 0.4 * s, 1.2 * s, 0.4 * s); c.strokeStyle = 'rgba(43,45,66,0.5)'; c.lineWidth = 2; c.beginPath(); c.moveTo(this.X(p.x), this.Y(p.y) - 0.4 * s); c.lineTo(this.X(p.x), 0); c.stroke(); }
+    }
   }
   star(x, y) {
     const c = this.cx, r = 0.45 * this.cam.s, X = this.X(x), Y = this.Y(y + Math.sin(this.time * 3 + x) * 0.15);
@@ -146,7 +175,7 @@ export class View {
     const c = this.cx, s = this.cam.s, a = k.angle * Math.PI / 180, X = this.X(k.x), Y = this.Y(k.y);
     if (k.type === 'swing') { c.strokeStyle = '#555'; c.lineWidth = 2; c.beginPath(); c.moveTo(this.X(k.base[0]), this.Y(k.base[1] + k.swingL)); c.lineTo(X, Y); c.stroke(); }
     if (k.type === 'slide') { c.strokeStyle = 'rgba(255,255,255,0.35)'; c.lineWidth = 4; c.beginPath(); c.moveTo(X, this.Y(k.base[1] - k.slide)); c.lineTo(X, this.Y(k.base[1] + k.slide)); c.stroke(); }
-    const used = k.used && k !== m.cannon;
+    const used = k.used && k !== m.cannon, wheels = !m.cannons || k.id === 'p1' || k.id === 'p2';
     c.save(); c.translate(X, Y); c.globalAlpha = used ? 0.4 : 1;
     c.save(); c.rotate(-a); c.translate(-k.recoil * 0.5 * s, 0);
     const body = k.type === 'blast' ? '#ff8a00' : k.type === 'swivel' ? '#4fd1ff' : k.type === 'swing' ? '#9b7bff' : k.type === 'slide' ? '#7dffb2' : '#2b2d42';
@@ -155,11 +184,11 @@ export class View {
     c.fillStyle = '#ffd23f'; c.fillRect(k.len * s - 0.22 * s, -0.48 * s, 0.22 * s, 0.96 * s); c.fillRect(0.25 * s, -0.52 * s, 0.14 * s, 1.04 * s);
     if (k.flash > 0.05) { c.fillStyle = `rgba(255,220,90,${k.flash})`; c.beginPath(); c.moveTo(k.len * s, -0.5 * s); c.lineTo((k.len + 1.6 * k.flash) * s, 0); c.lineTo(k.len * s, 0.5 * s); c.fill(); }
     c.restore();
-    if (!m.cannons) { c.fillStyle = '#6b3e1e'; c.beginPath(); c.arc(-0.1 * s, 0.45 * s, 0.55 * s, 0, 7); c.fill(); c.strokeStyle = '#2b1a0c'; c.stroke(); c.beginPath(); c.arc(-0.1 * s, 0.45 * s, 0.15 * s, 0, 7); c.fillStyle = '#ffd23f'; c.fill(); }
-    if (m.cannons && k === m.loaded && m.phase === 'aim' && k.type !== 'start') { c.strokeStyle = '#fff'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(0, 0, 1.6 * s, 0, 7); c.stroke(); c.setLineDash([]);
+    if (wheels) { c.fillStyle = '#6b3e1e'; c.beginPath(); c.arc(-0.1 * s, 0.45 * s, 0.55 * s, 0, 7); c.fill(); c.strokeStyle = '#2b1a0c'; c.stroke(); c.beginPath(); c.arc(-0.1 * s, 0.45 * s, 0.15 * s, 0, 7); c.fillStyle = '#ffd23f'; c.fill(); }
+    if (m.loaded && k === m.loaded && m.phase === 'aim' && k.type !== 'start') { c.strokeStyle = '#fff'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(0, 0, 1.6 * s, 0, 7); c.stroke(); c.setLineDash([]);
       const left = Math.max(0, 1 - m.wait / (k.type === 'blast' ? 0.45 : 4)); c.strokeStyle = '#ffd23f'; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, 1.6 * s, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); c.stroke(); }
     c.restore();
-    if (m.cannons && m.phase === 'aim' && k === m.loaded) this.path(k.arc(m.W.g, 0.28, 10), 'rgba(255,255,255,0.8)', 3, [3, 6]);
+    if (m.loaded && m.phase === 'aim' && k === m.loaded) this.path(k.arc(m.W.g, 0.28, 10), 'rgba(255,255,255,0.8)', 3, [3, 6]);
   }
   aimArc(m) {
     const k = m.cannon, pts = k.arc(m.W.g, 0.55, 16);
@@ -211,6 +240,7 @@ export class View {
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter(p => p.t < (p.big ? 2.2 : 1.4));
     this.pops.forEach((p, i) => {
+      if (p.t < 0) return;
       const a = Math.min(1, 3 - p.t * 2), y = this.Y(p.y) - 40 - p.t * 45 - p.slot * 40, x = this.X(p.x), sc = Math.min(1, p.t * 8) * (p.big ? 1.6 : 1);
       c.globalAlpha = Math.max(0, a); c.font = `900 ${Math.round(20 * sc)}px system-ui, sans-serif`; c.lineWidth = 5; c.strokeStyle = 'rgba(30,20,50,0.85)';
       c.strokeText(p.text, x, y); c.fillStyle = p.color; c.fillText(p.text, x, y);
