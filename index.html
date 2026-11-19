@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Noodle Cannon · concept sampler</title>
+<style>
+  :root { --ink: #1b1530; --paper: #fff8ec; --pink: #ff4f6d; --sun: #ffd23f; --sky: #4fd1ff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--ink); color: #fff; font-family: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; touch-action: none; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  [hidden] { display: none !important; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  .bar { position: absolute; top: 10px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .tag { background: rgba(27,21,48,.72); border-radius: 14px; padding: 8px 12px; backdrop-filter: blur(4px); }
+  #mtitle { font-weight: 900; letter-spacing: .02em; } #seed { font-size: 11px; opacity: .7; margin-left: 6px; } #hleft { font-size: 13px; opacity: .9; margin-top: 2px; }
+  .score { text-align: right; } #hscore { font-size: 30px; font-weight: 900; line-height: 1; color: var(--sun); text-shadow: 0 2px 0 #0006; } #hsub { font-size: 12px; opacity: .85; }
+  #fams { position: absolute; top: 72px; left: 12px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 70%; }
+  #fams span { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 99px; background: rgba(27,21,48,.45); color: #fff6; text-transform: uppercase; letter-spacing: .05em; transition: all .15s; }
+  #fams span.on { background: var(--c); color: var(--ink); transform: scale(1.08); }
+  #puffs { position: absolute; top: 100px; left: 14px; font-size: 18px; } #puffs i { opacity: .4; font-style: normal; }
+  #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; background: rgba(27,21,48,.6); padding: 6px 12px; border-radius: 99px; white-space: nowrap; max-width: 96vw; overflow: hidden; text-overflow: ellipsis; }
+  #toast { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); background: var(--ink); border: 2px solid var(--sun); padding: 10px 16px; border-radius: 14px; font-weight: 700; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; text-align: center; }
+  .overlay { position: fixed; inset: 0; overflow: auto; background: radial-gradient(ellipse at top, #3b2f7a, var(--ink) 70%); display: grid; place-items: center; padding: 24px 14px; }
+  .menu { max-width: 1060px; width: 100%; }
+  h1 { font-size: clamp(34px, 6vw, 62px); margin: 0; font-weight: 900; letter-spacing: -.02em; line-height: 1; }
+  h1 b { color: var(--pink); } .lead { opacity: .85; max-width: 720px; margin: 10px 0 20px; line-height: 1.45; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
+  .card { background: var(--paper); color: var(--ink); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 0 #0005; }
+  .card .k { font-size: 11px; font-weight: 900; letter-spacing: .12em; color: #8a7bb8; }
+  .card h3 { margin: 0; font-size: 26px; font-weight: 900; }
+  .card p { margin: 0; line-height: 1.4; font-size: 14px; }
+  .card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; }
+  .card .best { font-size: 12px; font-weight: 700; color: #8a7bb8; margin-top: auto; }
+  button { font: inherit; font-weight: 900; border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; background: var(--pink); color: #fff; box-shadow: 0 4px 0 #a8203a; }
+  button:active { transform: translateY(2px); box-shadow: 0 2px 0 #a8203a; }
+  .card:nth-child(2) button { background: #1aa2c9; box-shadow: 0 4px 0 #0e6a85; } .card:nth-child(3) button { background: #3c9a39; box-shadow: 0 4px 0 #22631f; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; opacity: .9; }
+  select { font: inherit; border-radius: 10px; padding: 6px 8px; }
+  .keys { margin-top: 14px; font-size: 12px; opacity: .7; line-height: 1.6; }
+  kbd { background: #fff2; border-radius: 5px; padding: 1px 6px; font-family: inherit; }
+  .panel { background: var(--paper); color: var(--ink); border-radius: 22px; padding: 22px; max-width: 520px; width: 100%; text-align: center; }
+  .panel h2 { margin: 6px 0 12px; font-size: 28px; } .panel table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; } .panel td { padding: 5px 4px; border-top: 1px solid #0001; }
+  .pb { display: inline-block; background: var(--sun); padding: 4px 10px; border-radius: 99px; font-weight: 900; }
+  .panel .row { justify-content: center; }
+  #touch { position: fixed; bottom: 46px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 12px; pointer-events: none; }
+  #touch div { display: flex; gap: 10px; } #touch button { pointer-events: auto; width: 62px; height: 62px; border-radius: 50%; padding: 0; font-size: 13px; background: rgba(27,21,48,.7); box-shadow: none; border: 2px solid #fff6; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud" hidden>
+  <div class="bar">
+    <div class="tag"><span id="mtitle"></span><span id="seed"></span><div id="hleft"></div></div>
+    <div class="tag score"><div id="hscore">0</div><div id="hsub"></div></div>
+  </div>
+  <div id="fams"></div><div id="puffs"></div><div id="hint"></div>
+</div>
+<div id="touch" hidden>
+  <div><button data-hold="left">⟲</button><button data-hold="right">⟳</button></div>
+  <div><button data-hold="tuck">TUCK</button><button data-hold="fire">FIRE<br>PUFF</button></div>
+</div>
+<div id="toast"></div>
+
+<div id="menu" class="overlay">
+  <div class="menu">
+    <h1>NOODLE <b>CANNON</b></h1>
+    <p class="lead">Three playable concepts built on one physics toy: a cannon, a limp crash-test noodle, and stuff to hit. In the air you can spin, tuck (spin faster, like a diver) and puff. Variety of tricks raises the multiplier. Play each, then pick the one to grow.</p>
+    <div class="cards">
+      <div class="card"><div class="k">CONCEPT A</div><h3>Launch Party</h3>
+        <p>Five shots into one seeded field of crate towers, TNT, bumpers, trampolines and balloons. Damage stays, so every shot rebuilds the playground for the next.</p>
+        <ul><li>Physics fun: chain reactions, collapses, ragdoll piles</li><li>Return hook: daily field, ghost of your best shot</li><li>Feels like: Angry Birds × Happy Wheels</li></ul>
+        <div class="best" id="best-launch"></div><button data-play="launch">Play Launch Party</button></div>
+      <div class="card"><div class="k">CONCEPT B</div><h3>Barrel Relay</h3>
+        <p>An endless chain of cannons over the sea. Each one catches you; swivelling, swinging and sliding cannons turn the fire button into timing. Two puffs per hop to save a bad shot.</p>
+        <ul><li>Physics fun: air control, last-second puff saves, slow-mo catches</li><li>Return hook: one more run, rising difficulty</li><li>Feels like: DK barrel blasts × Flappy tension</li></ul>
+        <div class="best" id="best-relay"></div><button data-play="relay">Play Barrel Relay</button></div>
+      <div class="card"><div class="k">CONCEPT C</div><h3>Flop Golf</h3>
+        <p>The cannon is your club, the noodle is your ball. It rolls to wherever you came to rest. Hills, water, sand, windmills and crate walls between you and the cup.</p>
+        <ul><li>Physics fun: reading tumbles, bounces and slopes</li><li>Return hook: three daily holes, par, scorecard</li><li>Feels like: Golf With Your Friends × QWOP</li></ul>
+        <div class="best" id="best-golf"></div><button data-play="golf">Play Flop Golf</button></div>
+    </div>
+    <div class="row">Course: <select id="seedSel"><option value="daily">Daily (same for everyone today)</option><option value="random">Random</option></select></div>
+    <div class="keys">Aim: mouse, or <kbd>W</kbd><kbd>S</kbd> angle · <kbd>A</kbd><kbd>D</kbd> power. Fire: click / <kbd>Space</kbd>. In the air: <kbd>←</kbd><kbd>→</kbd> spin · hold <kbd>↓</kbd>/<kbd>Shift</kbd> tuck · <kbd>Space</kbd>/<kbd>↑</kbd> or click puff. <kbd>R</kbd> retry · <kbd>N</kbd> new course · <kbd>M</kbd> sound · <kbd>Esc</kbd> menu. Touch: drag to aim, lift to fire, tap to puff.</div>
+  </div>
+</div>
+<div id="result" class="overlay" hidden>
+  <div class="panel"><div id="rbody"></div>
+    <div class="row"><button id="again">Same course (R)</button><button id="newseed">New course (N)</button><button id="tomenu">Concepts</button></div></div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
