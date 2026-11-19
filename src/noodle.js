@@ -28,7 +28,9 @@ export class Noodle {
     this.muscles = [];
     for (const [a, b, mn, mx] of LIMITS) { const d = Math.hypot(P[a].x - P[b].x, P[a].y - P[b].y); const st = W.stick(P[a], P[b], { min: d * mn, max: d * mx, k: 0.6 }); st.rest = d; st.fmin = mn; st.fmax = mx; this.muscles.push([a, b, st]); }
     this.tuckSt = TUCK.map(([a, b, f]) => { const st = this.muscles.find(m => m[0] === a && m[1] === b)[2]; return [st, f]; });
-    this.tucked = 0;
+    this.tucked = 0; this.pose = 'loose';
+    this.spreadMin = { chesthandL: 0.92, chesthandR: 0.92, pelvisfootL: 0.95, pelvisfootR: 0.95, chestkneeL: 0.9, chestkneeR: 0.9, kneeLkneeR: 1.5 };
+    for (const p of this.list) p.sail = 1;
     if (opt.spin) this.spin(opt.spin);
   }
   com() { let x = 0, y = 0, m = 0; for (const p of this.list) { x += p.x * p.mass; y += p.y * p.mass; m += p.mass; } return [x / m, y / m]; }
@@ -51,10 +53,27 @@ export class Noodle {
   // Position-based muscles shorten the chord a limb travels, which bleeds angular momentum (a known PBD loss).
   // In free flight we put it back, so tucking really does spin you up like a diver.
   keepMomentum(L0) { if (this.touching()) return; const [L, I] = this.angular(); if (I > 1e-6) this.spin((L0 - L) / I); }
-  setTuck(on) {
-    this.tucked = on ? 1 : 0;
-    for (const [st, f] of this.tuckSt) { st.max = st.rest * (on ? f : st.fmax); st.k = on ? 0.5 : 0.6; }
-    for (const p of this.list) p.drag = on ? 0.002 : 0.004;     // spread out = more drag, a little glide
+  setTuck(on) { this.setPose(on ? 'tuck' : 'loose'); }
+  // loose: limp. tuck: ball up (spin faster, less drag). spread: star shape, limbs pushed out, body works as a wing.
+  setPose(pose) {
+    if (pose === this.pose) return; this.pose = pose; this.tucked = pose === 'tuck' ? 1 : 0;
+    for (const [st, f] of this.tuckSt) { st.max = st.rest * (pose === 'tuck' ? f : st.fmax); st.k = pose === 'tuck' ? 0.5 : 0.6; }
+    for (const [a, b, st] of this.muscles) if (this.spreadMin[a + b]) st.min = st.rest * (pose === 'spread' ? this.spreadMin[a + b] : st.fmin);
+    for (const p of this.list) { p.drag = pose === 'tuck' ? 0.002 : pose === 'spread' ? 0.006 : 0.004; p.sail = pose === 'tuck' ? 0.4 : pose === 'spread' ? 1.4 : 1; }
+  }
+  // flat-plate air force on the whole body while spread: pressure along the body normal, opposing the normal speed.
+  // Belly-first falls get braked hard; a shallow angle of attack at speed turns into lift. Returns lift-ish accel.
+  aero(dt) {
+    if (this.pose !== 'spread') return 0;
+    const P = this.parts, ux = P.chest.x - P.pelvis.x, uy = P.chest.y - P.pelvis.y, L = Math.hypot(ux, uy) || 1, nx = -uy / L, ny = ux / L;
+    const [vx, vy] = this.vel(), sp = Math.hypot(vx, vy), vn = vx * nx + vy * ny, k = 0.065;
+    const ax = -k * vn * sp * nx, ay = -k * vn * sp * ny, cap = 60, m = Math.hypot(ax, ay), f = m > cap ? cap / m : 1;
+    this.push(ax * f * dt, ay * f * dt); return ay * f;
+  }
+  // limp arms windmill a little in the air: pure comedy, internal (momentum-neutral) forces
+  flail(t) {
+    if (this.pose !== 'loose') return; const P = this.parts, s = Math.sin(t * 17), c = Math.cos(t * 13), k = 0.9;
+    this.W.addVel(P.handL, s * k, c * k); this.W.addVel(P.handR, -c * k, s * k); this.W.addVel(P.chest, (-s + c) * k * 0.1, (-c - s) * k * 0.1);
   }
   touching() { return this.list.some(p => p.hit); }
   remove() { for (const p of this.list) { p.off = true; p.x = p.px = -9999; p.y = p.py = -9999; } }
@@ -83,21 +102,22 @@ export class Cannon {
 }
 
 // ---------- the judge: every shot is a chain; variety of trick families raises the multiplier ----------
-export const FAMILIES = { air: 'Air', spin: 'Spin', bonk: 'Bonk', smash: 'Smash', boing: 'Boing', puff: 'Puff', target: 'Target', skim: 'Skim', far: 'Distance', tuck: 'Tuck' };
+export const FAMILIES = { air: 'Air', spin: 'Spin', bonk: 'Bonk', smash: 'Smash', boing: 'Boing', puff: 'Puff', target: 'Target', skim: 'Skim', far: 'Distance', tuck: 'Tuck', glide: 'Glide', swing: 'Swing', rocket: 'Rocket', boom: 'Boom', ride: 'Ride', strike: 'Strike' };
 
 export class Judge {
   constructor() { this.feed = []; this.reset(); }
   reset() {
     this.chain = null; this.feed.length = 0;
   }
-  start(noodle, x0) {
-    this.chain = { noodle, x0, air: 0, maxAir: 0, rot: 0, la: noodle.angle(), flips: 0, tuckFlips: 0, tuckRot: 0, bonked: new Set(), bonks: 0, smashed: 0,
+  start(noodle, x0, extra = []) {
+    const mine = new Set(); for (const n of [noodle, ...extra]) for (const p of n.list) mine.add(p);
+    this.chain = { noodle, x0, mine, glideT: 0, air: 0, maxAir: 0, rot: 0, la: noodle.angle(), flips: 0, tuckFlips: 0, tuckRot: 0, bonked: new Set(), bonks: 0, smashed: 0,
       boings: 0, puffs: 0, score: 0, raw: 0, fam: new Set(), keys: new Set(), mult: 1, dist: 0, skimT: 0, t: 0, still: 0, hardest: 0, landed: false };
   }
   award(key, title, pts, fam, x, y) {
     const c = this.chain; if (!c || c.keys.has(key)) return false;
     c.keys.add(key); c.fam.add(fam); c.raw += pts;
-    c.mult = Math.min(5, 1 + Math.floor(c.fam.size / 2));
+    c.mult = Math.min(6, 1 + Math.floor(c.fam.size / 2));
     c.score = Math.round(c.raw * c.mult);
     this.feed.push({ key, title, pts, fam, x, y, mult: c.mult });
     return true;
@@ -118,12 +138,13 @@ export class Judge {
     if (c.tuckRot >= 4 * Math.PI) this.award('tuck', 'Cannonball Dive', 150, 'tuck', cx, cy);
     // impacts
     for (const e of W.events) {
-      if (!n.list.includes(e.p)) continue;
+      if (!c.mine.has(e.p)) continue;
       c.hardest = Math.max(c.hardest, e.speed);
       const o = e.other; if (!o || e.speed < 6) continue;
       if (o.kick) { c.boings++; this.award('boing' + Math.min(c.boings, 3), ['Boing!', 'Boing Boing!', 'Professional Bouncer'][Math.min(c.boings, 3) - 1], [70, 90, 140][Math.min(c.boings, 3) - 1], 'boing', e.x, e.y); continue; }
       const id = o.id || o.tag || 'thing';
-      if (!c.bonked.has(id) && (o.v || o.kind === 'peg' || o.tag === 'ball' || o.kind === 'target')) {
+      if (o.tag === 'balloon' || c.mine.has(o)) continue;
+      if (!c.bonked.has(id) && (o.v || o.kind === 'peg' || o.tag === 'iron' || o.kind === 'target' || o.grp > 0 || o.kind === 'post')) {
         c.bonked.add(id); c.bonks++;
         this.award('bonk' + Math.min(c.bonks, 4), ['Bonk!', 'Second Bonk', 'Bonk Trilogy', 'Bonk Cinematic Universe'][Math.min(c.bonks, 4) - 1], [50, 70, 100, 150][Math.min(c.bonks, 4) - 1], 'bonk', e.x, e.y);
       }
@@ -138,7 +159,10 @@ export class Judge {
       const lo = Math.min(...n.list.map(p => p.y - p.r - ctx.groundY(p.x)));
       if (!touching && lo < 0.7 && lo > 0 && n.speed() > 10) { c.skimT += dt; if (c.skimT > 0.25) this.award('skim', 'Lawn Mower', 120, 'skim', cx, cy); } else c.skimT = 0;
     }
-    c.dist = Math.max(c.dist, cx - c.x0);
+    // gliding: spread, airborne, and actually carried by the air
+    if (n.pose === 'spread' && !touching && (ctx.lift || 0) > 4) { c.glideT += dt; [[0.8, 'Paper Airplane', 90], [2, 'Flying Squirrel', 160], [3.5, 'Wingsuit Licence Pending', 260]].forEach(([k, t, p], i) => { if (c.glideT >= k) this.award('glide' + i, t, p, 'glide', cx, cy); }); }
+    if (ctx.pins !== undefined) { const m = ctx.pins - (c.pins0 ?? (c.pins0 = ctx.pins)); if (m >= 4) this.award('pins0', 'Bowling Night', 120, 'strike', cx, cy); if (m >= 10) this.award('pins1', 'STRIKE!', 400, 'strike', cx, cy); }
+    c.dist = Math.max(c.dist, Math.abs(cx - c.x0));
     [[25, 'Long Haul', 40], [50, 'Postal Service', 90], [80, 'Interstate Noodle', 160], [120, 'Different Postcode', 260]].forEach(([k, t, p], i) => { if (c.dist >= k) this.award('far' + i, t, p, 'far', cx, cy); });
     c.still = n.speed() < 1.2 && c.t > 0.8 ? c.still + dt : 0;
   }
@@ -148,5 +172,6 @@ export class Judge {
     return { score: c.score, mult: c.mult, families: [...c.fam], flips: c.flips, air: +c.maxAir.toFixed(2), bonks: c.bonks, smashed: c.smashed, dist: +c.dist.toFixed(1), puffs: c.puffs, tricks: c.keys.size, hardest: +c.hardest.toFixed(1) }; }
 }
 
-export function movedCount(W) { let n = 0; for (const q of W.Q) if (q.moved && !q.kin) n++; return n; }
+export function movedCount(W) { let n = 0; for (const q of W.Q) if (q.moved && !q.kin && q.kind !== 'pin' && q.kind !== 'mill') n++; return n; }
+export function pinsDown(W) { let n = 0; for (const q of W.Q) if (q.kind === 'pin' && q.moved) n++; return n; }
 export { centre };

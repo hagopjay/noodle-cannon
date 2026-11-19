@@ -33,6 +33,31 @@ for (const [w, h, tag] of [[1280, 720, 'desk']]) {
   await p.waitForTimeout(3500);
   const g = await p.evaluate(() => { const m = window.__noodle.mode; return { phase: m.phase, strokes: m.strokes, cannonX: +m.cannon.x.toFixed(1) }; }); console.log('golf', JSON.stringify(g));
   await p.screenshot({ path: 'docs/media/golf-rest.png' });
+  // ammo: rocket in Launch Party
+  await p.evaluate(() => window.__noodle.start('launch', '2026-11-19')); await p.waitForTimeout(500);
+  await key('4'); await p.waitForTimeout(100); await p.mouse.move(800, 380); await p.waitForTimeout(100); await p.mouse.down(); await p.mouse.up();
+  await p.waitForTimeout(300); await p.keyboard.down(' '); await p.waitForTimeout(500); await p.screenshot({ path: 'docs/media/rocket.png' }); await p.keyboard.up(' ');
+  await p.waitForTimeout(2500); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+  // ammo: Munchausen ball, then glide
+  await key('6'); await p.mouse.move(900, 250); await p.waitForTimeout(100); await p.mouse.down(); await p.mouse.up();
+  await p.waitForTimeout(700); await p.screenshot({ path: 'docs/media/munchausen.png' });
+  await p.waitForTimeout(2500); await p.keyboard.press('Enter'); await p.waitForTimeout(300);
+  await key('3'); await p.mouse.move(1000, 150); await p.waitForTimeout(100); await p.mouse.down(); await p.mouse.up();
+  await p.keyboard.down('e'); await p.waitForTimeout(900); await p.screenshot({ path: 'docs/media/glide.png' }); await p.keyboard.up('e');
+  console.log('ammo run', JSON.stringify(await p.evaluate(() => { const m = window.__noodle.mode; return { shot: m.shot, total: m.total, inv: m.inv }; })));
+  // siege vs CPU: fire once, then let the CPU take its turn
+  await p.evaluate(() => window.__noodle.start('siege', '2026-11-19', { players: 1 })); await p.waitForTimeout(600);
+  await p.screenshot({ path: 'docs/media/siege-aim.png' });
+  await key('5'); await p.mouse.move(1000, 200); await p.waitForTimeout(100); await p.mouse.down(); await p.mouse.up();
+  await p.waitForTimeout(1300); await p.screenshot({ path: 'docs/media/siege-flight.png' });
+  await p.waitForTimeout(9000); await p.screenshot({ path: 'docs/media/siege-cpu.png' });
+  console.log('siege', JSON.stringify(await p.evaluate(() => { const m = window.__noodle.mode; return { turn: m.turn, player: m.player, phase: m.phase, kings: m.kings.map(s => s.filter(k => !k.down).length) }; })));
+  // toy box: drop a toy with right-click, fire a triple
+  await p.evaluate(() => window.__noodle.start('toybox', '2026-11-19')); await p.waitForTimeout(500);
+  await p.click('#toys button[data-toy=pendulum]'); await p.mouse.click(1000, 500, { button: 'right' }); await p.waitForTimeout(200);
+  await key('2'); await p.mouse.move(900, 300); await p.waitForTimeout(100); await p.mouse.down(); await p.mouse.up();
+  await p.waitForTimeout(1600); await p.screenshot({ path: 'docs/media/toybox.png' });
+  console.log('toybox', JSON.stringify(await p.evaluate(() => { const m = window.__noodle.mode; return { phase: m.phase, ropes: m.W.ropes.length, Q: m.W.Q.length }; })));
   // phone
   const q = await b.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   q.on('pageerror', e => errors.push(String(e)));

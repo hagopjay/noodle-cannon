@@ -22,10 +22,10 @@
   #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; background: rgba(27,21,48,.6); padding: 6px 12px; border-radius: 99px; white-space: nowrap; max-width: 96vw; overflow: hidden; text-overflow: ellipsis; }
   #toast { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); background: var(--ink); border: 2px solid var(--sun); padding: 10px 16px; border-radius: 14px; font-weight: 700; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; text-align: center; }
   .overlay { position: fixed; inset: 0; overflow: auto; background: radial-gradient(ellipse at top, #3b2f7a, var(--ink) 70%); display: grid; place-items: center; padding: 24px 14px; }
-  .menu { max-width: 1060px; width: 100%; }
+  .menu { max-width: 1320px; width: 100%; }
   h1 { font-size: clamp(34px, 6vw, 62px); margin: 0; font-weight: 900; letter-spacing: -.02em; line-height: 1; }
   h1 b { color: var(--pink); } .lead { opacity: .85; max-width: 720px; margin: 10px 0 20px; line-height: 1.45; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
   .card { background: var(--paper); color: var(--ink); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 0 #0005; }
   .card .k { font-size: 11px; font-weight: 900; letter-spacing: .12em; color: #8a7bb8; }
   .card h3 { margin: 0; font-size: 26px; font-weight: 900; }
@@ -34,7 +34,7 @@
   .card .best { font-size: 12px; font-weight: 700; color: #8a7bb8; margin-top: auto; }
   button { font: inherit; font-weight: 900; border: 0; border-radius: 14px; padding: 12px 16px; cursor: pointer; background: var(--pink); color: #fff; box-shadow: 0 4px 0 #a8203a; }
   button:active { transform: translateY(2px); box-shadow: 0 2px 0 #a8203a; }
-  .card:nth-child(2) button { background: #1aa2c9; box-shadow: 0 4px 0 #0e6a85; } .card:nth-child(3) button { background: #3c9a39; box-shadow: 0 4px 0 #22631f; }
+  .card:nth-child(2) button { background: #1aa2c9; box-shadow: 0 4px 0 #0e6a85; } .card:nth-child(3) button { background: #3c9a39; box-shadow: 0 4px 0 #22631f; } .card:nth-child(4) button { background: #8a4f7a; box-shadow: 0 4px 0 #5a2f4f; } .card:nth-child(5) button { background: #ff8a00; box-shadow: 0 4px 0 #a85a00; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 16px; font-size: 13px; opacity: .9; }
   select { font: inherit; border-radius: 10px; padding: 6px 8px; }
   .keys { margin-top: 14px; font-size: 12px; opacity: .7; line-height: 1.6; }
@@ -43,6 +43,12 @@
   .panel h2 { margin: 6px 0 12px; font-size: 28px; } .panel table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; } .panel td { padding: 5px 4px; border-top: 1px solid #0001; }
   .pb { display: inline-block; background: var(--sun); padding: 4px 10px; border-radius: 99px; font-weight: 900; }
   .panel .row { justify-content: center; }
+  #ammo { position: absolute; left: 12px; bottom: 44px; display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; max-width: 70vw; }
+  #ammo button, #toys button { pointer-events: auto; background: rgba(27,21,48,.78); box-shadow: none; border: 2px solid #fff3; border-radius: 12px; padding: 5px 8px; font-size: 18px; display: flex; align-items: center; gap: 5px; color: #fff; }
+  #ammo button b { font-size: 11px; } #ammo button i { font-style: normal; font-size: 11px; background: #fff2; border-radius: 6px; padding: 0 5px; }
+  #ammo button.sel, #toys button.sel { border-color: var(--sun); background: rgba(255,210,63,.25); } #ammo button:disabled { opacity: .35; }
+  #toys { position: absolute; right: 12px; top: 84px; display: flex; flex-direction: column; gap: 4px; pointer-events: auto; } #toys button { font-size: 11px; padding: 4px 8px; }
+  .duo { display: flex; gap: 8px; } .duo button { flex: 1; }
   #touch { position: fixed; bottom: 46px; left: 0; right: 0; display: flex; justify-content: space-between; padding: 0 12px; pointer-events: none; }
   #touch div { display: flex; gap: 10px; } #touch button { pointer-events: auto; width: 62px; height: 62px; border-radius: 50%; padding: 0; font-size: 13px; background: rgba(27,21,48,.7); box-shadow: none; border: 2px solid #fff6; }
 </style>
@@ -54,18 +60,18 @@
     <div class="tag"><span id="mtitle"></span><span id="seed"></span><div id="hleft"></div></div>
     <div class="tag score"><div id="hscore">0</div><div id="hsub"></div></div>
   </div>
-  <div id="fams"></div><div id="puffs"></div><div id="hint"></div>
+  <div id="fams"></div><div id="puffs"></div><div id="hint"></div><div id="ammo"></div><div id="toys"></div>
 </div>
 <div id="touch" hidden>
   <div><button data-hold="left">⟲</button><button data-hold="right">⟳</button></div>
-  <div><button data-hold="tuck">TUCK</button><button data-hold="fire">FIRE<br>PUFF</button></div>
+  <div><button data-hold="glide">GLIDE</button><button data-hold="tuck">TUCK</button><button data-hold="fire">FIRE<br>PUFF</button></div>
 </div>
 <div id="toast"></div>
 
 <div id="menu" class="overlay">
   <div class="menu">
     <h1>NOODLE <b>CANNON</b></h1>
-    <p class="lead">Three playable concepts built on one physics toy: a cannon, a limp crash-test noodle, and stuff to hit. In the air you can spin, tuck (spin faster, like a diver) and puff. Variety of tricks raises the multiplier. Play each, then pick the one to grow.</p>
+    <p class="lead">Five ways to play one physics toy: a cannon, a limp crash-test noodle, six kinds of ammo and a box of toys. In the air you spin, tuck (spin faster, like a diver), spread out to glide, and puff. Different kinds of trick raise the multiplier. Play them all, then pick the one to grow.</p>
     <div class="cards">
       <div class="card"><div class="k">CONCEPT A</div><h3>Launch Party</h3>
         <p>Five shots into one seeded field of crate towers, TNT, bumpers, trampolines and balloons. Damage stays, so every shot rebuilds the playground for the next.</p>
@@ -79,9 +85,17 @@
         <p>The cannon is your club, the noodle is your ball. It rolls to wherever you came to rest. Hills, water, sand, windmills and crate walls between you and the cup.</p>
         <ul><li>Physics fun: reading tumbles, bounces and slopes</li><li>Return hook: three daily holes, par, scorecard</li><li>Feels like: Golf With Your Friends × QWOP</li></ul>
         <div class="best" id="best-golf"></div><button data-play="golf">Play Flop Golf</button></div>
+      <div class="card"><div class="k">CONCEPT D · NEW</div><h3>Noodle Siege</h3>
+        <p>Two forts, three crowned kings each, wind that changes every turn. Take turns firing every kind of ammo; knock all three enemy kings to the ground.</p>
+        <ul><li>Physics fun: artillery arcs, wind, collapsing forts, cannonball riding</li><li>Return hook: rivalry, against the CPU or a friend on one screen</li><li>Feels like: Worms × Angry Birds</li></ul>
+        <div class="best" id="best-siege"></div><div class="duo"><button data-play="siege" data-players="1">vs CPU</button><button data-play="siege" data-players="2">2 players</button></div></div>
+      <div class="card"><div class="k">CONCEPT E · NEW</div><h3>Toy Box</h3>
+        <p>No rules. Unlimited shots, every ammo, and you drop the toys: fans, pendulums, seesaws, rope bridges, bowling pins, balloon crates, TNT forts.</p>
+        <ul><li>Physics fun: build contraptions, then wreck them</li><li>Return hook: experimentation, shareable chaos</li><li>Feels like: Garry's Mod in 2D</li></ul>
+        <div class="best">Z toggles slow motion</div><button data-play="toybox">Open the Toy Box</button></div>
     </div>
     <div class="row">Course: <select id="seedSel"><option value="daily">Daily (same for everyone today)</option><option value="random">Random</option></select></div>
-    <div class="keys">Aim: mouse, or <kbd>W</kbd><kbd>S</kbd> angle · <kbd>A</kbd><kbd>D</kbd> power. Fire: click / <kbd>Space</kbd>. In the air: <kbd>←</kbd><kbd>→</kbd> spin · hold <kbd>↓</kbd>/<kbd>Shift</kbd> tuck · <kbd>Space</kbd>/<kbd>↑</kbd> or click puff. <kbd>R</kbd> retry · <kbd>N</kbd> new course · <kbd>M</kbd> sound · <kbd>Esc</kbd> menu. Touch: drag to aim, lift to fire, tap to puff.</div>
+    <div class="keys">Aim: mouse, or <kbd>W</kbd><kbd>S</kbd> angle · <kbd>A</kbd><kbd>D</kbd> power. Fire: click / <kbd>Space</kbd>. Ammo: <kbd>1</kbd>–<kbd>6</kbd> or <kbd>Q</kbd>. In the air: <kbd>←</kbd><kbd>→</kbd> spin · hold <kbd>↓</kbd>/<kbd>Shift</kbd> tuck · hold <kbd>E</kbd> glide · <kbd>Space</kbd> ammo action / puff (or click toward the pointer). <kbd>Z</kbd> slow motion. <kbd>R</kbd> retry · <kbd>N</kbd> new course · <kbd>M</kbd> sound · <kbd>Esc</kbd> menu. Touch: drag to aim, lift to fire, tap to puff.</div>
   </div>
 </div>
 <div id="result" class="overlay" hidden>

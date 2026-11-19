@@ -1,6 +1,6 @@
 # Choose the concept
 
-All three are playable in `dist/noodle-cannon.html` and share the same engine, noodle, cannon and trick judge. Picking one decides where the next month of work goes; the others can survive as side modes.
+All five are playable in `dist/noodle-cannon.html` and share the same engine, noodle, cannon and trick judge. Picking one decides where the next month of work goes; the others can survive as side modes.
 
 ## A · Launch Party: *destruction sandbox*
 
@@ -29,9 +29,26 @@ All three are playable in `dist/noodle-cannon.html` and share the same engine, n
 - **Risks:** slower pace, and needs hand-tuned holes on top of the generated ones to be great.
 - **Grow it into:** an 18-hole course, a hole editor (the gamelab X3D level pipeline fits here), and same-hole ghosts from friends.
 
+## D · Noodle Siege: *rivalry* (v0.2)
+
+**Loop:** turn-based artillery. Each side has a fort with three crowned kings on crate columns, a cannon on a rock, and a hill between them. Wind changes every turn. Each side has limited special ammo. Knock all three enemy kings off their thrones.
+
+- **Physics fun:** reading wind and arcs, collapsing forts, Munchausen rides into the enemy keep, bomb rocket-jumps over the hill.
+- **Why people come back:** beating the CPU (it forecasts its own shots with a drag-and-wind model and gets them about 7 % wrong) or a friend on the same screen; wins and losses are tracked.
+- **Risks:** turn-based play is slower; online multiplayer is a big build.
+- **Grow it into:** online play (deterministic lockstep is possible because the simulation is deterministic), fort building before the battle, more ammo, campaign forts.
+
+## E · Toy Box: *creative sandbox* (v0.2)
+
+**Loop:** no goal. Drop toys, fire any ammo, watch the chaos, toggle slow motion.
+
+- **Physics fun:** the most. Contraptions such as a pendulum into TNT into a sky crate.
+- **Why people come back:** expression and sharing. It needs a share or replay feature to keep people.
+- **Risks:** little reason to come back without goals. It works best as the editor or practice mode inside another concept.
+
 ## My suggestion
 
-**C (Flop Golf), with A's destruction kit as hazards.** It has the clearest reason to return (par, daily holes, comparing scorecards). It rewards learning the physics instead of only spectacle, and every gamelab toy (crates, TNT, bumpers, fans, water) becomes a hole hazard. If you would rather have the most fun in the first 30 seconds, pick A.
+**Still C (Flop Golf) as the spine, now with the ammo as "clubs" (sticky to grab the flag, rocket for a long drive, bomb to escape a bunker) and the toys as hole hazards. Siege as the multiplayer mode and the Toy Box as the hole editor.** If you would rather have the most fun in the first 30 seconds, pick A. If you want something to play with friends, pick D.
 
 ## Choices that apply whatever you pick
 

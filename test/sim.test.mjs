@@ -65,3 +65,62 @@ test('Flop Golf: every hole of 5 seeds can be sunk by a simple aiming bot', () =
   const bot = (m, f) => { if (m.phase !== 'aim') return I(); const dx = (m.cup.x0 + m.cup.x1) / 2 - m.cannon.x; m.cannon.angle = dx >= 0 ? 50 : 130; m.cannon.power = Math.max(5, Math.min(34, Math.sqrt(20 * Math.abs(dx)) * (0.8 + 0.25 * ((m.strokes * 7) % 10) / 10))); return I({ fireP: f % 20 === 0 }); };
   for (const s of [11, 12, 13, 14, 15]) { const m = play(FlopGolf, s, 12000, bot); assert.ok(m.done, `seed ${s}: stuck on hole ${m.hole + 1} after ${m.strokes} strokes`); }
 });
+
+// ---------- v0.2: toys, ammo, glide, siege, toy box ----------
+import { NoodleSiege } from '../src/modes/siege.js';
+import { ToyBox } from '../src/modes/toybox.js';
+import { TOYS } from '../src/toys.js';
+import { rng } from '../src/engine.js';
+
+test('toys settle without blowing up: bridge, seesaw, pendulum, sky crate, pins, fan', () => {
+  const W = new World(); W.poly([[-20, 0], [120, 0], [120, -3], [-20, -3]]); const r = rng(3);
+  let x = 0; for (const k of ['bridge', 'seesaw', 'pendulum', 'skycrate', 'pins', 'fan']) x += TOYS[k](W, x, 0, r) + 6;
+  const sky = W.Q.find(q => q.v.some(v => W.ropes.some(rp => rp[0] === v)));
+  const y0 = centre(sky)[1];
+  for (let i = 0; i < 600; i++) W.step();
+  assert.ok(W.P.every(p => p.off || (Number.isFinite(p.x) && Math.abs(p.x) < 500 && Math.abs(p.y) < 500)), 'everything finite and nearby');
+  const maxV = Math.max(...W.Q.map(q => Math.hypot(q.v[0].vx0, q.v[0].vy0))); assert.ok(maxV < 3, `a toy is still moving fast after 10 s: ${maxV.toFixed(2)} m/s`);
+  assert.ok(Math.abs(centre(sky)[1] - y0) < 3, `balloon crate should hover, moved ${(centre(sky)[1] - y0).toFixed(2)} m`);
+});
+
+test('spreading out glides: a spread noodle falls slower than a limp one', () => {
+  const drop = (pose) => { const W = new World(); const n = new Noodle(W, 0, 60, 18, 0, { grp: 1, angle: -Math.PI / 2 }); n.setPose(pose);
+    for (let i = 0; i < 90; i++) { n.aero(1 / 60); W.step(); } return n.com()[1]; };
+  const loose = drop('loose'), spread = drop('spread');
+  assert.ok(spread > loose + 2, `spread ends at ${spread.toFixed(1)} m, limp at ${loose.toFixed(1)} m`);
+});
+
+const fly = (ammo, act) => { const m = new LaunchParty(77); m.ammo = ammo; let speedAfter = 0;
+  for (let f = 0; f < 900 && m.shot < 1; f++) { const fl = m.phase === 'fly'; m.tick(I({ fireP: !fl && f === 5, ...(fl ? act(m, f) : {}) })); if (fl && m.noodle && m.shotT > 0.55 && m.shotT < 0.6) speedAfter = m.noodle.speed(); m.fx.length = 0; }
+  return { m, speedAfter }; };
+test('every ammo fires, acts and finishes a shot with a finite world', () => {
+  for (const ammo of ['noodle', 'triple', 'sticky', 'rocket', 'bomb', 'ball']) {
+    const { m } = fly(ammo, (m) => I({ puffP: m.shotT > 0.4 && m.shotT < 0.45, actionH: m.shotT > 0.2 && m.shotT < 1 }));
+    assert.equal(m.shot, 1, ammo + ' shot did not end'); assert.ok(m.W.P.every(p => p.off || Number.isFinite(p.x)), ammo + ' NaN');
+    assert.equal(m.inv[ammo], ammo === 'noodle' ? Infinity : 0, ammo + ' inventory');
+  }
+});
+test('the bomb rocket-jumps you and the rocket boots add speed', () => {
+  const base = fly('noodle', () => I()).speedAfter;
+  const bomb = fly('bomb', (m) => I({ puffP: m.shotT > 0.5 && m.shotT < 0.52, up: 1 })).speedAfter;
+  const rocket = fly('rocket', (m) => I({ actionH: m.shotT < 0.55 })).speedAfter;
+  assert.ok(bomb > base + 8, `bomb ${bomb.toFixed(1)} vs ${base.toFixed(1)} m/s`); assert.ok(rocket > base + 5, `rocket ${rocket.toFixed(1)} vs ${base.toFixed(1)} m/s`);
+});
+test('sticky hands grab something and can let go', () => {
+  const W = new World(); W.poly([[-20, 0], [40, 0], [40, -3], [-20, -3]]);
+  const m = new LaunchParty(1); m.W = W; m.cannon.angle = 10; m.cannon.power = 14; m.ammo = 'sticky'; m.inv.sticky = 1; m.fire();
+  let grabbed = false; for (let i = 0; i < 240 && !grabbed; i++) { m.stepWorld(); grabbed = !!m.sp.grab; }
+  assert.ok(grabbed, 'no grab'); m.release(); assert.equal(m.sp.grab, null);
+});
+test('Noodle Siege: the CPU playing both sides always finishes a battle (6 seeds)', () => {
+  for (const s of [1, 2, 3, 4, 5, 6]) { const m = new NoodleSiege(s, { demo: true }); for (let f = 0; f < 40000 && !m.done; f++) { m.fx.length = 0; m.tick(I()); }
+    assert.ok(m.done && m.winner >= 0, `seed ${s}: turn ${m.turn}`); }
+});
+test('Noodle Siege is deterministic', () => {
+  const run = () => { const m = new NoodleSiege(9, { demo: true }); for (let f = 0; f < 2500; f++) { m.fx.length = 0; m.tick(I()); } return m.W.hash(); };
+  assert.equal(run(), run());
+});
+test('Toy Box: placing toys and clearing the field', () => {
+  const m = new ToyBox(2), q0 = m.W.Q.length; m.tick(I({ toy: 'pyramid' })); m.tick(I({ place: 30 })); assert.ok(m.W.Q.length > q0);
+  m.tick(I({ clear: true })); assert.equal(m.W.Q.length, 0);
+});

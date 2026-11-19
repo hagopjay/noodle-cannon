@@ -14,7 +14,9 @@ export class World {
     this.P = []; this.C = []; this.Q = []; this.S = [];
     this.events = []; this.frame = 0; this.time = 0;
     this.maxPush = opt.maxPush ?? 0.25; // metres per pass: deep overlaps bleed out instead of exploding
-    this.wind = 0;
+    this.wind = 0;          // horizontal wind acceleration scale (m/s^2 on a full sail)
+    this.fields = [];       // fans: {x0,x1,y0,y1,ax,ay} accelerate particles by their sail
+    this.ropes = [];        // particle chains, for drawing
   }
 
   // ---------- construction ----------
@@ -23,7 +25,7 @@ export class World {
       x: o.x, y: o.y, px: o.x - (o.vx || 0) * this.h, py: o.y - (o.vy || 0) * this.h,
       vx0: 0, vy0: 0, im: o.mass > 0 ? 1 / o.mass : 0, mass: o.mass || 0, r: o.r ?? 0.1,
       fric: o.fric ?? 0.5, rest: o.rest ?? 0.15, grp: o.grp || 0, drag: o.drag ?? 0.002, gs: o.gs ?? 1,
-      quad: null, tag: o.tag || '', off: false, hit: null, kin: false,
+      quad: null, tag: o.tag || '', off: false, hit: null, kin: false, nocol: !!o.nocol, sail: o.sail ?? 0.3,
     };
     this.P.push(p); return p;
   }
@@ -36,7 +38,7 @@ export class World {
   quad(o) {
     const { x, y, w, h } = o, a = o.a || 0, c = Math.cos(a), s = Math.sin(a), m = (o.mass ?? w * h * 4) / 4;
     const loc = [[-w, -h], [w, -h], [w, h], [-w, h]];
-    const v = loc.map(([lx, ly]) => this.particle({ x: x + lx * c - ly * s, y: y + lx * s + ly * c, mass: o.kin ? 0 : m, r: 0.02, fric: o.fric ?? 0.6, rest: o.rest ?? 0.05, grp: -1 }));
+    const v = loc.map(([lx, ly]) => this.particle({ x: x + lx * c - ly * s, y: y + lx * s + ly * c, mass: o.kin ? 0 : m, r: 0.02, fric: o.fric ?? 0.6, rest: o.rest ?? 0.05, grp: -1, sail: 0.03 }));
     const q = { v, id: o.id || 'q' + this.Q.length, kind: o.kind || 'crate', sleep: 0, asleep: !!o.asleep, kin: !!o.kin, x0: x, y0: y, a0: a, moved: false, hp: o.hp ?? 1, color: o.color, w, h };
     for (const p of v) { p.quad = q; p.kin = q.kin; }
     for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) this.stick(v[i], v[j]);
@@ -52,6 +54,17 @@ export class World {
       minx: Math.min(...xs), maxx: Math.max(...xs), miny: Math.min(...ys), maxy: Math.max(...ys) };
     this.S.push(s); return s;
   }
+  anchor(x, y) { return this.particle({ x, y, mass: 0, r: 0.05, nocol: true, tag: 'anchor' }); }
+  // a hanging chain of n links from particle a to particle b (b may be created by the caller); max-only sticks, so it can go slack
+  rope(a, b, n, o = {}) {
+    const pts = [a], L = Math.hypot(b.x - a.x, b.y - a.y) * (o.slack ?? 1);
+    for (let i = 1; i < n; i++) pts.push(this.particle({ x: a.x + (b.x - a.x) * i / n, y: a.y + (b.y - a.y) * i / n, mass: o.mass ?? 0.15, r: o.r ?? 0.06, grp: o.grp ?? -3, sail: 0.05, tag: 'rope', nocol: !o.collide }));
+    pts.push(b);
+    for (let i = 0; i < pts.length - 1; i++) this.stick(pts[i], pts[i + 1], { min: 0, max: L / n, k: 1 });
+    this.ropes.push(pts); return pts;
+  }
+  unlink(st) { const i = this.C.indexOf(st); if (i >= 0) this.C.splice(i, 1); }
+  kill(p) { p.off = true; p.x = p.px = -9999; p.y = p.py = -9999; this.C = this.C.filter(c => c.a !== p && c.b !== p); for (const r of this.ropes) { const i = r.indexOf(p); if (i >= 0) r.length = i; } }
   circle(x, y, r, o = {}) {
     const s = { type: 'circle', x, y, r, fric: o.fric ?? 0.3, rest: o.rest ?? 0.3, kick: o.kick || 0, id: o.id || 's' + this.S.length, kind: o.kind || 'peg',
       minx: x - r, maxx: x + r, miny: y - r, maxy: y + r };
@@ -82,11 +95,13 @@ export class World {
         p.vx0 = vx / h; p.vy0 = vy / h; p.hit = null;
         if (p.im === 0 || (p.quad && p.quad.asleep)) { p.px = p.x; p.py = p.y; continue; }
         const sp = Math.hypot(p.vx0, p.vy0), k = Math.max(0, 1 - p.drag * sp * h);   // quadratic air drag
-        const nvx = vx * k + (this.wind * p.drag * 8) * h * h, nvy = vy * k + this.g * p.gs * h * h;
+        let ax = this.wind * p.sail, ay = this.g * p.gs;
+        for (const f of this.fields) if (p.x > f.x0 && p.x < f.x1 && p.y > f.y0 && p.y < f.y1) { const fall = 1 - (p.y - f.y0) / (f.y1 - f.y0) * 0.5; ax += f.ax * p.sail * fall; ay += f.ay * p.sail * fall; }
+        const nvx = vx * k + ax * h * h, nvy = vy * k + ay * h * h;
         p.px = p.x; p.py = p.y; p.x += nvx; p.y += nvy;
       }
       for (const q of this.Q) this.bounds(q);
-      this.free = this.P.filter(p => !p.off && !p.quad);
+      this.free = this.P.filter(p => !p.off && !p.quad && !p.nocol);
       for (let it = 0; it < this.iters; it++) {
         for (const c of this.C) this.solveStick(c);
         this.collide(it === this.iters - 1);
