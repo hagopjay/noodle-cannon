@@ -1,0 +1,12 @@
+{
+  "name": "noodle-cannon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cannon + ragdoll physics game: three playable concepts on one deterministic engine.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check:browser": "node build.mjs && node tools/browser-check.mjs"
+  }
+}
