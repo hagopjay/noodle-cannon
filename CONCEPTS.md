@@ -48,7 +48,7 @@ All five are playable in `dist/noodle-cannon.html` and share the same engine, no
 
 ## Built (v0.3): C with A's hazards and the ammo as clubs
 
-Flop Golf now picks up the Launch Party toys as hole hazards (TNT stacks, small towers, trampolines, fans, balloons, sky crates, plus the existing bumpers, walls and windmills). Crates settle before play and damage persists between strokes on a hole. The ammo are the clubs: **Noodle** is the iron (unlimited); **Rocket** (driver) is available from hole 1; **Bomb** (wedge, for bunkers) joins on hole 2; **Sticky** and **Munchausen** join on hole 3. Each club is one per hole and counts as one stroke. At par + 6 the hole is picked up, so nobody gets stranded. Not built yet: grabbing the flag with Sticky, a hole editor, Siege as the multiplayer mode.
+Flop Golf now picks up the Launch Party toys as hole hazards (TNT stacks, small towers, trampolines, fans, balloons, sky crates, plus the existing bumpers, walls and windmills). Crates settle before play and damage persists between strokes on a hole. The ammo are the clubs: **Noodle** is the iron (unlimited); **Rocket** (driver) is available from hole 1; **Bomb** (wedge, for bunkers) joins on hole 2; **Sticky** and **Munchausen** join on hole 3. Each club is one per hole and counts as one stroke. At par + 6 the hole is picked up, so nobody gets stranded. **Flag grab (v0.4):** a Sticky hand that touches the flagstick grabs it (Flag Grab, +250); let go and you drop toward the hole. **Siege factorializer (v0.4):** the nth enemy king felled in one turn scores 500 × n! (500, 1000, 3000), shown in the HUD as n! = ×N; own goals don't count. Not built yet: the Toy Box as a hole editor, online Siege.
 
 ## My suggestion
 

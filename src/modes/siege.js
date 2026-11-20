@@ -5,6 +5,7 @@ import { Cannon } from '../noodle.js';
 import { TOYS, crate, resetIds } from '../toys.js';
 
 const FIELD = 66;
+export const fact = (n) => n <= 1 ? 1 : n * fact(n - 1);   // the Siege factorializer: the nth king felled in one turn scores 500 x n!
 
 export class NoodleSiege extends Mode {
   static id = 'siege';
@@ -12,7 +13,7 @@ export class NoodleSiege extends Mode {
   constructor(seed, opt = {}) {
     super(seed); const W = this.W, r = this.rnd; resetIds();
     this.theme = 'dusk'; this.cpu = opt.players !== 2; this.demo = !!opt.demo; this.turn = 0;   // demo: the CPU plays both sides
-    this.player = 0; this.done = false; this.winner = -1; this.length = FIELD;
+    this.player = 0; this.turnKings = 0; this.done = false; this.winner = -1; this.length = FIELD;
     W.poly([[-30, 0], [FIELD + 30, 0], [FIELD + 30, -8], [-30, -8]], { id: 'ground', kind: 'ground' });
     // a hill in the middle so flat shots do not work
     const hh = this.hillH = 3 + r() * 3; W.poly([[FIELD / 2 - 9, 0], [FIELD / 2 + 9, 0], [FIELD / 2 + 3, hh], [FIELD / 2 - 3, hh]], { id: 'hill', kind: 'stone' });
@@ -43,8 +44,13 @@ export class NoodleSiege extends Mode {
   checkKings() {
     for (const side of [0, 1]) for (const k of this.kings[side]) {
       if (k.down) continue; const [x, y] = centre(k);
-      if (y < Math.max(k.y0 - 1.5, 0.8) || Math.abs(x - k.x0) > 4 || !this.W.Q.includes(k))   /* knocked off the throne */ { k.down = true; this.emit('kingdown', { x, y, side, by: this.player }); if (this.judge.chain && side !== this.player) this.judge.target(k.id, 'REGICIDE', 500, x, y); }
+      if (y < Math.max(k.y0 - 1.5, 0.8) || Math.abs(x - k.x0) > 4 || !this.W.Q.includes(k))   /* knocked off the throne */ { k.down = true; this.emit('kingdown', { x, y, side, by: this.player }); if (side !== this.player) this.factorialize(x, y); }
     }
+  }
+  // each enemy king felled in the same turn multiplies by the next factorial: 1x, 2x, 6x of 500 points
+  factorialize(x, y) {
+    const n = ++this.turnKings, mult = fact(n), pts = 500 * mult; this.style[this.player] += pts;
+    this.emit('factorial', { x, y, n, mult, pts, text: n === 1 ? 'REGICIDE' : n === 2 ? 'DOUBLE REGICIDE' : 'TRIPLE REGICIDE' });
   }
   tick(inp) {
     if (this.phase === 'aim') {
@@ -65,7 +71,7 @@ export class NoodleSiege extends Mode {
     if (!a || !b) { this.done = true; this.phase = 'done'; this.winner = !b && a ? 0 : !a && b ? 1 : this.player; this.emit('round', { winner: this.winner, cpu: this.cpu, turns: this.turn + 1, style: this.style }); return; }
     if (this.noodle) this.noodle = null;
     while (this.bodies.length > 6) { const old = this.bodies.shift(); for (const p of old.list) this.W.kill(p); }
-    this.turn++; this.player = 1 - this.player; this.cannon = this.cannons[this.player]; this.inv = this.invs[this.player];
+    this.turnKings = 0; this.turn++; this.player = 1 - this.player; this.cannon = this.cannons[this.player]; this.inv = this.invs[this.player];
     if (!(this.inv[this.ammo] > 0)) this.ammo = 'noodle';
     this.newWind(); this.phase = 'aim'; this.cpuT = 0;
     this.emit('turn', { player: this.player, wind: this.wind, cpu: this.isCpu() });
@@ -120,7 +126,7 @@ export class NoodleSiege extends Mode {
   hud() {
     const dots = (s) => this.kings[s].map(k => k.down ? '○' : '♛').join('');
     const who = this.cpu ? (this.player ? 'CPU' : 'You') : 'Player ' + (this.player + 1);
-    return { left: `${who} · turn ${this.turn + 1}`, score: `${dots(0)}  vs  ${dots(1)}`, sub: `wind ${this.wind > 0 ? '→' : this.wind < 0 ? '←' : '·'} ${Math.abs(this.wind).toFixed(1)}`, wind: this.wind };
+    return { left: `${who} · turn ${this.turn + 1}`, score: `${dots(0)}  vs  ${dots(1)}`, sub: `wind ${this.wind > 0 ? '→' : this.wind < 0 ? '←' : '·'} ${Math.abs(this.wind).toFixed(1)}` + (this.turnKings ? ` · ${this.turnKings}! = ×${fact(this.turnKings)}` : '') + ` · style ${this.style[0]} / ${this.style[1]}`, wind: this.wind };
   }
   camTarget() {
     if (this.phase === 'fly' && this.noodle) { const [x, y] = this.noodle.com(); return [x, Math.max(y, 5), 0.85]; }
