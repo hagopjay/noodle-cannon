@@ -1017,6 +1017,9 @@ class BarrelRelay extends Mode {
 // sim: Concept C — FLOP GOLF. The cannon is your club and the noodle is your ball. Fire, watch it tumble,
 // the cannon rolls to wherever the noodle stopped, fire again. Sink the noodle in the cup in as few shots as possible.
 
+// Clubs: the ammo kinds are golf clubs. Noodle is the iron (unlimited); the rest are one per hole, unlocked as the round goes on.
+const CLUBS = [{ rocket: 1 }, { rocket: 1, bomb: 1 }, { rocket: 1, bomb: 1, sticky: 1, ball: 1 }];
+
 class FlopGolf extends Mode {
   static id = 'golf';
   static title = 'Flop Golf';
@@ -1025,7 +1028,8 @@ class FlopGolf extends Mode {
     this.build();
   }
   build() {
-    const r = this.rnd; this.W = new World(); const W = this.W;
+    const r = this.rnd; this.W = new World(); const W = this.W; resetIds();
+    this.inv = Object.assign({ noodle: Infinity }, CLUBS[Math.min(this.hole, CLUBS.length - 1)]); this.ammo = 'noodle';
     this.bodies = []; this.noodle = null; this.strokes = 0; this.phase = 'aim'; this.holed = 0;
     const L = 60 + Math.floor(r() * 45) + this.hole * 10; this.L = L;
     const cup = L - 6; this.cup = { x0: cup - 1.6, x1: cup + 1.6, y: 0, depth: 1.6 };
@@ -1066,17 +1070,21 @@ class FlopGolf extends Mode {
     const nObs = 1 + Math.floor(r() * 2) + this.hole;
     for (let k = 0; k < nObs; k++) {
       const x = 16 + r() * (L - 30), y = ground(x); if (this.water && x > this.water.x0 - 2 && x < this.water.x1 + 2) continue; if (Math.abs(x - cup) < 6) continue;
-      const kind = ['wall', 'mill', 'bumper', 'mill'][Math.floor(r() * 4)];
-      if (kind === 'wall') { const h = 2 + Math.floor(r() * 3); for (let i = 0; i < h; i++) W.quad({ x, y: y + 0.5 + i, w: 0.5, h: 0.5, asleep: true, id: 'w' + k + i }); }
+      const kind = ['wall', 'mill', 'bumper', 'mill', 'tnt', 'tramp', 'fan', 'balloons', 'skycrate', 'tower'][Math.floor(r() * 10)];
+      if (kind === 'tnt') { crate(W, x, y + 0.5); tnt(W, x, y + 1.5); }   // Launch Party hazards, as golf obstacles
+      else if (kind === 'tower') TOYS.tower(W, x, y, r, { h: 2 + Math.floor(r() * 3), cols: 1 });
+      else if (kind === 'tramp' || kind === 'fan' || kind === 'balloons' || kind === 'skycrate') TOYS[kind](W, x, y, r);
+      else if (kind === 'wall') { const h = 2 + Math.floor(r() * 3); for (let i = 0; i < h; i++) W.quad({ x, y: y + 0.5 + i, w: 0.5, h: 0.5, asleep: true, id: 'w' + k + i }); }
       else if (kind === 'bumper') W.circle(x, y + 3 + r() * 3, 0.8, { kick: 14, kind: 'bumper', id: 'b' + k, rest: 0.9 });
       else { const m = W.quad({ x, y: y + 4, w: 2.6, h: 0.18, kin: true, kind: 'mill', id: 'mill' + k }); m.cx = x; m.cy = y + 4; m.w8 = (r() < 0.5 ? -1 : 1) * (1.2 + r() * 1.4); W.circle(x, y + 4, 0.25, { kind: 'peg', id: 'hub' + k }); this.mills.push(m); }
     }
     W.pre = (t) => { for (const m of this.mills) { const a = t * m.w8, c = Math.cos(a), s = Math.sin(a); const loc = [[-m.w, -m.h], [m.w, -m.h], [m.w, m.h], [-m.w, m.h]];
       m.v.forEach((p, i) => { p.px = p.x; p.py = p.y; p.x = m.cx + loc[i][0] * c - loc[i][1] * s; p.y = m.cy + loc[i][0] * s + loc[i][1] * c; }); } };
+    this.settle(150);   // let crates sag before play, so nothing counts as damage the player did not do
     this.par = 2 + Math.round(L / 45) + (this.water ? 1 : 0);
     this.cannon = new Cannon(0, 1.1, { angle: 45, power: 20, minP: 5, maxP: 34, maxA: 175 });   // can shoot back if you overshoot
     this.tee = [0, 1.1]; this.last = [0, 1.1];
-    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space.';
+    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space. Clubs 1-6.';
   }
   groundY(x) { return this.groundFn(x); }
   inCup(n) {   // any torso part below the rim, or the centre of mass over the hole and at rim height (it is going in)
@@ -1084,7 +1092,10 @@ class FlopGolf extends Mode {
     return [n.parts.pelvis, n.parts.chest].some(b => inX(b.x) && b.y < k.y - 0.15) || (inX(cx) && cy < k.y + 0.25);
   }
   tick(inp) {
-    if (this.phase === 'aim') this.aimControl(inp);
+    if (this.phase === 'aim' && this.strokes >= this.par + 6) {   // pick up: nobody gets stranded on a hole
+      this.card.push({ hole: this.hole + 1, par: this.par, strokes: this.strokes, name: 'Pick up (+6)', style: 0 });
+      this.emit('caption', { text: 'Pick up! +6 is the limit.' }); this.phase = 'between'; this.wait = 2.5;
+    } else if (this.phase === 'aim') this.aimControl(inp);
     else if (this.phase === 'fly') {
       this.flyControl(inp);
       const n = this.noodle, [cx, cy] = n.com(), ch = this.judge.chain;
@@ -1097,7 +1108,9 @@ class FlopGolf extends Mode {
     this.cannon.recoil *= 0.88; this.cannon.flash *= 0.8;
   }
   fire() { super.fire(); this.strokes++; this.emit('stroke', { n: this.strokes }); }
+  endShot() { if (!(this.inv[this.ammo] > 0)) this.ammo = 'noodle'; if (this.sp && this.sp.grab) this.release(); if (this.sp && this.sp.ball) this.W.kill(this.sp.ball); }
   rest() {   // the cannon rolls to where the noodle came to rest
+    this.endShot();
     const r = this.judge.finish(), n = this.noodle, k = this.cup;
     let x = Math.max(-8, Math.min(this.L + 10, n.parts.pelvis.x));
     if (x > k.x0 - 0.8 && x < k.x1 + 0.8) x = x < (k.x0 + k.x1) / 2 ? k.x0 - 0.8 : k.x1 + 0.8;   // never park the cannon over the hole
@@ -1107,10 +1120,11 @@ class FlopGolf extends Mode {
     this.emit('rest', { x, result: r });
   }
   penalty(why) {
-    this.judge.finish(); this.noodle.remove(); this.noodle = null; this.strokes++; this.phase = 'aim';
+    this.endShot(); this.judge.finish(); this.noodle.remove(); this.noodle = null; this.strokes++; this.phase = 'aim';
     this.cannon.x = this.last[0]; this.cannon.y = this.last[1]; this.emit('caption', { text: why }); this.emit('splash', { x: this.cannon.x, y: this.cannon.y });
   }
   sink() {
+    this.endShot();
     const r = this.judge.finish(), d = this.strokes - this.par;
     const name = this.strokes === 1 ? 'HOLE IN ONE!' : d <= -2 ? 'Eagle!' : d === -1 ? 'Birdie!' : d === 0 ? 'Par' : d === 1 ? 'Bogey' : d === 2 ? 'Double bogey' : `+${d}`;
     this.card.push({ hole: this.hole + 1, par: this.par, strokes: this.strokes, name, style: r.score });
@@ -1689,7 +1703,7 @@ function effects(m) {
       case 'rest': if (e.result.score > 0) view.pop(e.x, m.groundY(e.x) + 2, `style ${e.result.score}`, null, '#ffd23f'); break;
       case 'stroke': break;
       case 'sink': sfx.fanfare(); view.pop(e.x, e.y + 2, e.name, `${e.strokes} stroke${e.strokes > 1 ? 's' : ''}`, '#ffd23f', true); view.burst(e.x, e.y + 1, 50, CONF, 10, 1.4); break;
-      case 'newhole': toast(`Hole ${e.hole}`); break;
+      case 'newhole': toast(`Hole ${e.hole}`); buildBars(); break;
       case 'caption': toast(e.text); break;
       case 'round': setTimeout(() => showResult(m, e), 1400); break;
       case 'flame': view.burst(e.x, e.y, 2, ['#ffd23f', '#ff8a00', '#ff3b3b'], 3, 0.35, 0, 0.12); if (sfx.gate('flame', 90)) sfx.noise(0.12, 0.15, 900); for (const p of view.parts.slice(-2)) { p.vx += e.dx * 12; p.vy += e.dy * 12; } break;

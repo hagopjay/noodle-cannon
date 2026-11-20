@@ -124,3 +124,32 @@ test('Toy Box: placing toys and clearing the field', () => {
   const m = new ToyBox(2), q0 = m.W.Q.length; m.tick(I({ toy: 'pyramid' })); m.tick(I({ place: 30 })); assert.ok(m.W.Q.length > q0);
   m.tick(I({ clear: true })); assert.equal(m.W.Q.length, 0);
 });
+
+test('Flop Golf: hazards from Launch Party appear and clubs unlock hole by hole', () => {
+  const kinds = new Set(); let withClubs = 0;
+  for (const s of [11, 12, 13, 14, 15, 16, 17, 18]) { const m = new FlopGolf(s); for (const q of m.W.Q) kinds.add(q.kind); for (const b of m.W.S) kinds.add(b.kind); if (m.inv.rocket === 1) withClubs++; assert.equal(m.inv.noodle, Infinity); assert.equal(m.inv.bomb, undefined, 'bomb is locked on hole 1'); }
+  assert.equal(withClubs, 8);
+  assert.ok(['tnt', 'tramp', 'fan', 'plank', 'bumper'].some(k => kinds.has(k)), `no Launch Party hazard in 8 seeds: ${[...kinds]}`);
+  const m = new FlopGolf(11); m.hole = 2; m.build(); assert.deepEqual(Object.keys(m.inv).sort(), ['ball', 'bomb', 'noodle', 'rocket', 'sticky']);
+});
+
+test('Flop Golf: every club fires, ends the shot and uses itself up', () => {
+  for (const club of ['rocket', 'bomb', 'sticky', 'ball']) {
+    const m = new FlopGolf(21); m.hole = 2; m.build(); m.pickAmmo(club); assert.equal(m.ammo, club);
+    const s0 = m.strokes; m.fire(); assert.equal(m.inv[club], 0, club + ' is consumed'); assert.equal(m.strokes, s0 + 1);
+    for (let f = 0; f < 3000 && m.phase === 'fly'; f++) { m.fx.length = 0; m.tick(I({ puffP: f % 25 === 0, actionH: f < 60 })); }
+    assert.notEqual(m.phase, 'fly', club + ' shot never ended');
+    assert.ok(!m.sp.grab, 'grabs released');
+  }
+});
+
+test('Flop Golf with hazards and clubs is deterministic (same seed, same hash)', () => {
+  const bot = (m, f) => { if (m.phase !== 'aim') return I(); const dx = (m.cup.x0 + m.cup.x1) / 2 - m.cannon.x; m.cannon.angle = dx >= 0 ? 50 : 130; m.cannon.power = Math.max(5, Math.min(34, Math.sqrt(20 * Math.abs(dx)))); if (m.strokes === 0 && m.inv.rocket) m.pickAmmo('rocket'); return I({ fireP: f % 20 === 0 }); };
+  const a = play(FlopGolf, 31, 1500, bot), b = play(FlopGolf, 31, 1500, bot);
+  assert.equal(a.W.hash(), b.W.hash());
+});
+
+test('Flop Golf: pick up at par+6 so a hole can never strand the player', () => {
+  const m = new FlopGolf(3); m.hole = 2; m.build(); m.strokes = m.par + 6; m.tick(I());
+  assert.equal(m.phase, 'between'); assert.equal(m.card.at(-1).name, 'Pick up (+6)');
+});

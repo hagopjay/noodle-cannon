@@ -109,7 +109,7 @@ function effects(m) {
       case 'rest': if (e.result.score > 0) view.pop(e.x, m.groundY(e.x) + 2, `style ${e.result.score}`, null, '#ffd23f'); break;
       case 'stroke': break;
       case 'sink': sfx.fanfare(); view.pop(e.x, e.y + 2, e.name, `${e.strokes} stroke${e.strokes > 1 ? 's' : ''}`, '#ffd23f', true); view.burst(e.x, e.y + 1, 50, CONF, 10, 1.4); break;
-      case 'newhole': toast(`Hole ${e.hole}`); break;
+      case 'newhole': toast(`Hole ${e.hole}`); buildBars(); break;
       case 'caption': toast(e.text); break;
       case 'round': setTimeout(() => showResult(m, e), 1400); break;
       case 'flame': view.burst(e.x, e.y, 2, ['#ffd23f', '#ff8a00', '#ff3b3b'], 3, 0.35, 0, 0.12); if (sfx.gate('flame', 90)) sfx.noise(0.12, 0.15, 900); for (const p of view.parts.slice(-2)) { p.vx += e.dx * 12; p.vy += e.dy * 12; } break;
