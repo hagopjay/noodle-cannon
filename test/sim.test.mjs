@@ -153,3 +153,23 @@ test('Flop Golf: pick up at par+6 so a hole can never strand the player', () => 
   const m = new FlopGolf(3); m.hole = 2; m.build(); m.strokes = m.par + 6; m.tick(I());
   assert.equal(m.phase, 'between'); assert.equal(m.card.at(-1).name, 'Pick up (+6)');
 });
+
+test('Siege factorializer: the nth king felled in one turn scores 500 x n!, own goals do not count', async () => {
+  const { NoodleSiege, fact } = await import('../src/modes/siege.js');
+  assert.deepEqual([1, 2, 3, 4].map(fact), [1, 2, 6, 24]);
+  const m = new NoodleSiege(5, { players: 2 }), fell = (k) => m.W.Q.splice(m.W.Q.indexOf(k), 1);
+  fell(m.kings[1][0]); fell(m.kings[1][1]); m.checkKings();
+  assert.equal(m.style[0], 500 + 1000, 'two kings in one turn: 500 + 1000'); assert.equal(m.turnKings, 2);
+  fell(m.kings[1][2]); m.checkKings(); assert.equal(m.style[0], 500 + 1000 + 3000);
+  const m2 = new NoodleSiege(5, { players: 2 }); m2.W.Q.splice(m2.W.Q.indexOf(m2.kings[0][0]), 1); m2.checkKings();
+  assert.equal(m2.style[0], 0, 'your own king falling is not a regicide'); assert.equal(m2.turnKings, 0);
+});
+
+test('Flop Golf: a sticky hand on the flagstick grabs it, and letting go drops you in the hole area', () => {
+  const m = new FlopGolf(11); m.hole = 2; m.build(); m.pickAmmo('sticky'); m.fire();
+  for (let i = 0; i < 12; i++) { m.fx.length = 0; m.tick(I()); }
+  const k = m.cup, px = (k.x0 + k.x1) / 2, h = m.noodle.parts.handR; h.x = h.px = px + 0.3; h.y = h.py = k.y + 2;
+  m.tick(I()); assert.ok(m.sp.grab && m.flagged, 'hand on the pole should grab it');
+  assert.ok(m.judge.feed.some(f => f.title === 'Flag Grab!'));
+  m.tick(I({ puffP: 1 })); assert.equal(m.sp.grab, null, 'puff lets go');
+});

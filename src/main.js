@@ -115,6 +115,7 @@ function effects(m) {
       case 'flame': view.burst(e.x, e.y, 2, ['#ffd23f', '#ff8a00', '#ff3b3b'], 3, 0.35, 0, 0.12); if (sfx.gate('flame', 90)) sfx.noise(0.12, 0.15, 900); for (const p of view.parts.slice(-2)) { p.vx += e.dx * 12; p.vy += e.dy * 12; } break;
       case 'grab': sfx.tone(300, 120, 0.1, 'square', 0.15); view.burst(e.x, e.y, 8, ['#ff4fa3', '#fff'], 4, 0.4); break;
       case 'release': sfx.tone(500, 900, 0.1, 'triangle', 0.15); break;
+      case 'factorial': sfx.fanfare(); view.pop(e.x, e.y + 3, e.text + (e.n > 1 ? ` ${e.n}! = ×${e.mult}` : ''), `+${e.pts}`, '#ff9d2e', e.n > 1); if (e.n > 1) view.burst(e.x, e.y, 20 * e.n, ['#ffd23f', '#ff9d2e', '#fff'], 10, 1.2); break;
       case 'kingdown': sfx.fanfare(); view.kick(0.8); view.pop(e.x, e.y + 2, e.side === e.by ? 'Own goal, Your Majesty' : 'KING DOWN!', null, '#ffd23f', true); view.burst(e.x, e.y, 30, ['#ffd23f', '#fff', '#ff4f6d'], 9, 1); break;
       case 'turn': toast(e.cpu ? `CPU is aiming… wind ${windTxt(e.wind)}` : `${m.cpu ? 'Your' : 'Player ' + (e.player + 1) + "'s"} turn · wind ${windTxt(e.wind)}`, 2200); buildBars(); break;
       case 'ammo': { const a = AMMO[e.id]; toast(`${a.icon} ${a.name}: ${a.desc}`, 2600); buildBars(); break; }

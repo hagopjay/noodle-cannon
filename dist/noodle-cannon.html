@@ -1084,7 +1084,7 @@ class FlopGolf extends Mode {
     this.par = 2 + Math.round(L / 45) + (this.water ? 1 : 0);
     this.cannon = new Cannon(0, 1.1, { angle: 45, power: 20, minP: 5, maxP: 34, maxA: 175 });   // can shoot back if you overshoot
     this.tee = [0, 1.1]; this.last = [0, 1.1];
-    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space. Clubs 1-6.';
+    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space. Clubs 1-6. Sticky can grab the flagstick.';
   }
   groundY(x) { return this.groundFn(x); }
   inCup(n) {   // any torso part below the rim, or the centre of mass over the hole and at rim height (it is going in)
@@ -1097,7 +1097,7 @@ class FlopGolf extends Mode {
       this.emit('caption', { text: 'Pick up! +6 is the limit.' }); this.phase = 'between'; this.wait = 2.5;
     } else if (this.phase === 'aim') this.aimControl(inp);
     else if (this.phase === 'fly') {
-      this.flyControl(inp);
+      this.flyControl(inp); this.flagCheck();
       const n = this.noodle, [cx, cy] = n.com(), ch = this.judge.chain;
       if (this.inCup(n)) { this.holed += DT; if (this.holed > 0.5) return this.sink(); } else this.holed = 0;
       if (this.water && cx > this.water.x0 && cx < this.water.x1 && cy < this.groundFn(this.water.x0) - 0.3) return this.penalty('Splash! +1 stroke');
@@ -1108,6 +1108,18 @@ class FlopGolf extends Mode {
     this.cannon.recoil *= 0.88; this.cannon.flash *= 0.8;
   }
   fire() { super.fire(); this.strokes++; this.emit('stroke', { n: this.strokes }); }
+  // Sticky clubs can grab the flagstick (it is the pole drawn over the cup). Hang on it, let go, and you drop into the hole.
+  flagCheck() {
+    const sp = this.sp, n = this.noodle, k = this.cup; if (!sp || sp.kind !== 'sticky' || sp.grab || sp.grabs >= 2 || sp.cool > 0 || this.shotT < 0.15 || !n) return;
+    const px = (k.x0 + k.x1) / 2;
+    for (const h of [n.parts.handL, n.parts.handR]) {
+      if (Math.abs(h.x - px) > 0.9 || h.y < k.y - 0.2 || h.y > k.y + 4.4) continue;
+      const ty = Math.min(k.y + 4.2, Math.max(k.y + 0.2, h.y)), target = this.W.anchor(px, ty), d = Math.hypot(px - h.x, ty - h.y);
+      sp.grab = { st: this.W.stick(h, target, { min: 0, max: d + 0.05 }), target, hand: h }; sp.grabs++; this.flagged = true;
+      this.judge.award('flag', 'Flag Grab!', 250, 'swing', h.x, h.y); this.emit('grab', { x: h.x, y: h.y }); this.puffs = Math.max(this.puffs, 1);
+      return;
+    }
+  }
   endShot() { if (!(this.inv[this.ammo] > 0)) this.ammo = 'noodle'; if (this.sp && this.sp.grab) this.release(); if (this.sp && this.sp.ball) this.W.kill(this.sp.ball); }
   rest() {   // the cannon rolls to where the noodle came to rest
     this.endShot();
@@ -1149,6 +1161,7 @@ class FlopGolf extends Mode {
 // Take turns (against the CPU or a friend on the same screen). Knock all three enemy kings to the ground to win.
 
 const FIELD = 66;
+const fact = (n) => n <= 1 ? 1 : n * fact(n - 1);   // the Siege factorializer: the nth king felled in one turn scores 500 x n!
 
 class NoodleSiege extends Mode {
   static id = 'siege';
@@ -1156,7 +1169,7 @@ class NoodleSiege extends Mode {
   constructor(seed, opt = {}) {
     super(seed); const W = this.W, r = this.rnd; resetIds();
     this.theme = 'dusk'; this.cpu = opt.players !== 2; this.demo = !!opt.demo; this.turn = 0;   // demo: the CPU plays both sides
-    this.player = 0; this.done = false; this.winner = -1; this.length = FIELD;
+    this.player = 0; this.turnKings = 0; this.done = false; this.winner = -1; this.length = FIELD;
     W.poly([[-30, 0], [FIELD + 30, 0], [FIELD + 30, -8], [-30, -8]], { id: 'ground', kind: 'ground' });
     // a hill in the middle so flat shots do not work
     const hh = this.hillH = 3 + r() * 3; W.poly([[FIELD / 2 - 9, 0], [FIELD / 2 + 9, 0], [FIELD / 2 + 3, hh], [FIELD / 2 - 3, hh]], { id: 'hill', kind: 'stone' });
@@ -1187,8 +1200,13 @@ class NoodleSiege extends Mode {
   checkKings() {
     for (const side of [0, 1]) for (const k of this.kings[side]) {
       if (k.down) continue; const [x, y] = centre(k);
-      if (y < Math.max(k.y0 - 1.5, 0.8) || Math.abs(x - k.x0) > 4 || !this.W.Q.includes(k))   /* knocked off the throne */ { k.down = true; this.emit('kingdown', { x, y, side, by: this.player }); if (this.judge.chain && side !== this.player) this.judge.target(k.id, 'REGICIDE', 500, x, y); }
+      if (y < Math.max(k.y0 - 1.5, 0.8) || Math.abs(x - k.x0) > 4 || !this.W.Q.includes(k))   /* knocked off the throne */ { k.down = true; this.emit('kingdown', { x, y, side, by: this.player }); if (side !== this.player) this.factorialize(x, y); }
     }
+  }
+  // each enemy king felled in the same turn multiplies by the next factorial: 1x, 2x, 6x of 500 points
+  factorialize(x, y) {
+    const n = ++this.turnKings, mult = fact(n), pts = 500 * mult; this.style[this.player] += pts;
+    this.emit('factorial', { x, y, n, mult, pts, text: n === 1 ? 'REGICIDE' : n === 2 ? 'DOUBLE REGICIDE' : 'TRIPLE REGICIDE' });
   }
   tick(inp) {
     if (this.phase === 'aim') {
@@ -1209,7 +1227,7 @@ class NoodleSiege extends Mode {
     if (!a || !b) { this.done = true; this.phase = 'done'; this.winner = !b && a ? 0 : !a && b ? 1 : this.player; this.emit('round', { winner: this.winner, cpu: this.cpu, turns: this.turn + 1, style: this.style }); return; }
     if (this.noodle) this.noodle = null;
     while (this.bodies.length > 6) { const old = this.bodies.shift(); for (const p of old.list) this.W.kill(p); }
-    this.turn++; this.player = 1 - this.player; this.cannon = this.cannons[this.player]; this.inv = this.invs[this.player];
+    this.turnKings = 0; this.turn++; this.player = 1 - this.player; this.cannon = this.cannons[this.player]; this.inv = this.invs[this.player];
     if (!(this.inv[this.ammo] > 0)) this.ammo = 'noodle';
     this.newWind(); this.phase = 'aim'; this.cpuT = 0;
     this.emit('turn', { player: this.player, wind: this.wind, cpu: this.isCpu() });
@@ -1264,7 +1282,7 @@ class NoodleSiege extends Mode {
   hud() {
     const dots = (s) => this.kings[s].map(k => k.down ? '○' : '♛').join('');
     const who = this.cpu ? (this.player ? 'CPU' : 'You') : 'Player ' + (this.player + 1);
-    return { left: `${who} · turn ${this.turn + 1}`, score: `${dots(0)}  vs  ${dots(1)}`, sub: `wind ${this.wind > 0 ? '→' : this.wind < 0 ? '←' : '·'} ${Math.abs(this.wind).toFixed(1)}`, wind: this.wind };
+    return { left: `${who} · turn ${this.turn + 1}`, score: `${dots(0)}  vs  ${dots(1)}`, sub: `wind ${this.wind > 0 ? '→' : this.wind < 0 ? '←' : '·'} ${Math.abs(this.wind).toFixed(1)}` + (this.turnKings ? ` · ${this.turnKings}! = ×${fact(this.turnKings)}` : '') + ` · style ${this.style[0]} / ${this.style[1]}`, wind: this.wind };
   }
   camTarget() {
     if (this.phase === 'fly' && this.noodle) { const [x, y] = this.noodle.com(); return [x, Math.max(y, 5), 0.85]; }
@@ -1709,6 +1727,7 @@ function effects(m) {
       case 'flame': view.burst(e.x, e.y, 2, ['#ffd23f', '#ff8a00', '#ff3b3b'], 3, 0.35, 0, 0.12); if (sfx.gate('flame', 90)) sfx.noise(0.12, 0.15, 900); for (const p of view.parts.slice(-2)) { p.vx += e.dx * 12; p.vy += e.dy * 12; } break;
       case 'grab': sfx.tone(300, 120, 0.1, 'square', 0.15); view.burst(e.x, e.y, 8, ['#ff4fa3', '#fff'], 4, 0.4); break;
       case 'release': sfx.tone(500, 900, 0.1, 'triangle', 0.15); break;
+      case 'factorial': sfx.fanfare(); view.pop(e.x, e.y + 3, e.text + (e.n > 1 ? ` ${e.n}! = ×${e.mult}` : ''), `+${e.pts}`, '#ff9d2e', e.n > 1); if (e.n > 1) view.burst(e.x, e.y, 20 * e.n, ['#ffd23f', '#ff9d2e', '#fff'], 10, 1.2); break;
       case 'kingdown': sfx.fanfare(); view.kick(0.8); view.pop(e.x, e.y + 2, e.side === e.by ? 'Own goal, Your Majesty' : 'KING DOWN!', null, '#ffd23f', true); view.burst(e.x, e.y, 30, ['#ffd23f', '#fff', '#ff4f6d'], 9, 1); break;
       case 'turn': toast(e.cpu ? `CPU is aiming… wind ${windTxt(e.wind)}` : `${m.cpu ? 'Your' : 'Player ' + (e.player + 1) + "'s"} turn · wind ${windTxt(e.wind)}`, 2200); buildBars(); break;
       case 'ammo': { const a = AMMO[e.id]; toast(`${a.icon} ${a.name}: ${a.desc}`, 2600); buildBars(); break; }

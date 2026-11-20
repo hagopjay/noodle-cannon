@@ -72,7 +72,7 @@ export class FlopGolf extends Mode {
     this.par = 2 + Math.round(L / 45) + (this.water ? 1 : 0);
     this.cannon = new Cannon(0, 1.1, { angle: 45, power: 20, minP: 5, maxP: 34, maxA: 175 });   // can shoot back if you overshoot
     this.tee = [0, 1.1]; this.last = [0, 1.1];
-    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space. Clubs 1-6.';
+    this.hint = 'Sink the noodle in the cup. Aim with mouse or W/S + A/D. Fire: click/Space. Clubs 1-6. Sticky can grab the flagstick.';
   }
   groundY(x) { return this.groundFn(x); }
   inCup(n) {   // any torso part below the rim, or the centre of mass over the hole and at rim height (it is going in)
@@ -85,7 +85,7 @@ export class FlopGolf extends Mode {
       this.emit('caption', { text: 'Pick up! +6 is the limit.' }); this.phase = 'between'; this.wait = 2.5;
     } else if (this.phase === 'aim') this.aimControl(inp);
     else if (this.phase === 'fly') {
-      this.flyControl(inp);
+      this.flyControl(inp); this.flagCheck();
       const n = this.noodle, [cx, cy] = n.com(), ch = this.judge.chain;
       if (this.inCup(n)) { this.holed += DT; if (this.holed > 0.5) return this.sink(); } else this.holed = 0;
       if (this.water && cx > this.water.x0 && cx < this.water.x1 && cy < this.groundFn(this.water.x0) - 0.3) return this.penalty('Splash! +1 stroke');
@@ -96,6 +96,18 @@ export class FlopGolf extends Mode {
     this.cannon.recoil *= 0.88; this.cannon.flash *= 0.8;
   }
   fire() { super.fire(); this.strokes++; this.emit('stroke', { n: this.strokes }); }
+  // Sticky clubs can grab the flagstick (it is the pole drawn over the cup). Hang on it, let go, and you drop into the hole.
+  flagCheck() {
+    const sp = this.sp, n = this.noodle, k = this.cup; if (!sp || sp.kind !== 'sticky' || sp.grab || sp.grabs >= 2 || sp.cool > 0 || this.shotT < 0.15 || !n) return;
+    const px = (k.x0 + k.x1) / 2;
+    for (const h of [n.parts.handL, n.parts.handR]) {
+      if (Math.abs(h.x - px) > 0.9 || h.y < k.y - 0.2 || h.y > k.y + 4.4) continue;
+      const ty = Math.min(k.y + 4.2, Math.max(k.y + 0.2, h.y)), target = this.W.anchor(px, ty), d = Math.hypot(px - h.x, ty - h.y);
+      sp.grab = { st: this.W.stick(h, target, { min: 0, max: d + 0.05 }), target, hand: h }; sp.grabs++; this.flagged = true;
+      this.judge.award('flag', 'Flag Grab!', 250, 'swing', h.x, h.y); this.emit('grab', { x: h.x, y: h.y }); this.puffs = Math.max(this.puffs, 1);
+      return;
+    }
+  }
   endShot() { if (!(this.inv[this.ammo] > 0)) this.ammo = 'noodle'; if (this.sp && this.sp.grab) this.release(); if (this.sp && this.sp.ball) this.W.kill(this.sp.ball); }
   rest() {   // the cannon rolls to where the noodle came to rest
     this.endShot();
