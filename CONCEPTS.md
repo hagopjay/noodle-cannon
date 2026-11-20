@@ -46,6 +46,10 @@ All five are playable in `dist/noodle-cannon.html` and share the same engine, no
 - **Why people come back:** expression and sharing. It needs a share or replay feature to keep people.
 - **Risks:** little reason to come back without goals. It works best as the editor or practice mode inside another concept.
 
+## Built (v0.3): C with A's hazards and the ammo as clubs
+
+Flop Golf now picks up the Launch Party toys as hole hazards (TNT stacks, small towers, trampolines, fans, balloons, sky crates, plus the existing bumpers, walls and windmills). Crates settle before play and damage persists between strokes on a hole. The ammo are the clubs: **Noodle** is the iron (unlimited); **Rocket** (driver) is available from hole 1; **Bomb** (wedge, for bunkers) joins on hole 2; **Sticky** and **Munchausen** join on hole 3. Each club is one per hole and counts as one stroke. At par + 6 the hole is picked up, so nobody gets stranded. Not built yet: grabbing the flag with Sticky, a hole editor, Siege as the multiplayer mode.
+
 ## My suggestion
 
 **Still C (Flop Golf) as the spine, now with the ammo as "clubs" (sticky to grab the flag, rocket for a long drive, bomb to escape a bunker) and the toys as hole hazards. Siege as the multiplayer mode and the Toy Box as the hole editor.** If you would rather have the most fun in the first 30 seconds, pick A. If you want something to play with friends, pick D.
